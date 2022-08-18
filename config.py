@@ -8,11 +8,11 @@ class Config():
         self.sucker = sucker
         self.temptation = temptation
         self.punishment = punishment
-        self.episodes = n_episodes
+        self.n_episodes = n_episodes
         self.discount = discount
 
     def __repr__(self):
-        return 'Configs: ' + ' episodes=' + str(self.episodes) + \
+        return 'Configs: ' + ' episodes=' + str(self.n_episodes) + \
             ' discount=' + str(self.discount) + \
             '\npayoff matrix: ' + \
             ' r=' + str(self.reward) + \

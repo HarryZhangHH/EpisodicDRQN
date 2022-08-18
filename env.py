@@ -1,6 +1,3 @@
-from boto import config
-
-
 class Environment():
     """
     PD payoff matrix
