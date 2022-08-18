@@ -61,7 +61,15 @@ def main():
     if choice == 1:
         print('here are the strategies, choose one\n', choices)
         num = int(input('choose a strategy via number'))
+        print('You will use the strategy '+strategies[num])
         simulation.testStrategy(strategies, num, config)
 
+    if choice == 2:
+        print('who do you want to play against')
+        print(choices)
+        num = int(input('choose a strategy via number'))
+        strategy = strategies[num]
+        rounds = int(input('how many rounds do you want to play:'))
+        
 if __name__ == "__main__":
     main()
