@@ -45,13 +45,10 @@ class QLearningAgent(AbstractAgent):
         self.n_actions = config.n_actions
         self.own_memory = torch.zeros((config.n_episodes, ))
         self.opponent_memory = torch.zeros((config.n_episodes, ))
-        self.Q_table = torch.full((2**config.h, 2), float('-inf'))
+        self.Q_table = torch.zeros((2**config.h, 2))
+        # self.Q_table = torch.full((2**config.h, 2), float('-inf'))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.state = None
-        if config.n_episodes < 10:
-            self.h = 1
-        else:
-            self.h = config.h
         
     # def build(self):
     #     self.policy_net = NeuralNetwork(self.h, self.n_actions).to(self.device)
@@ -60,38 +57,37 @@ class QLearningAgent(AbstractAgent):
         # target_net.eval()
         # memory = ReplayMemory(10000)
 
-    def act(self):
-        n_random = (2**self.h)*self.n_actions
+    def act(self, oppo_agent):
+        n_random = (2**self.config.h)*self.n_actions
         # the last h actions of the opponent
-        self.state = decode_one_hot(self.opponent_memory[self.play_times-self.h : self.play_times])
-        if self.play_times < self.h:
+        # self.state = decode_one_hot(self.opponent_memory[self.play_times-self.h : self.play_times])
+        self.opponent_action = torch.as_tensor(oppo_agent.own_memory[oppo_agent.play_times-self.config.h : oppo_agent.play_times])
+        self.state = decode_one_hot(self.opponent_action)
+        if self.play_times < self.config.h:
             self.state = None
-        if self.play_times <= n_random:
-            return int(self.select_action(self.state, True))
+        if self.play_times < n_random:
+            return int(self.select_action(True))
         else:
-            return int(self.select_action(self.state))
+            return int(self.select_action())
 
     
-    def update(self, reward, own_action, opponent_action):
+    def update(self, reward, own_action, opponent_action, oppo_agent):
         super(QLearningAgent, self).update(reward)
         self.own_memory[self.play_times-1] = own_action
         self.opponent_memory[self.play_times-1] = opponent_action
         if self.state is not None:
-            if self.Q_table[self.state, own_action] != float('-inf'):
-                # Q learning
-                self.Q_table[self.state, own_action] = (1-self.config.alpha)*self.Q_table[self.state, own_action]\
-                    + self.config.alpha*(reward + self.config.discount*inf_0(torch.max(self.Q_table[opponent_action])))
-            else:
-                self.Q_table[self.state, own_action] = self.config.alpha*(reward + self.config.discount*inf_0(torch.max(self.Q_table[opponent_action])))
+            self.next_state = decode_one_hot(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]))
+            # Q learning
+            self.Q_table[self.state, own_action] = (1-self.config.alpha)*self.Q_table[self.state, own_action]\
+                + self.config.alpha*(reward + self.config.discount*(torch.max(self.Q_table[self.next_state])))
 
-    def select_action(self, state, random_flag=False):
+    def select_action(self, random_flag=False):
         sample = random.random()
-        self.state = state
         if sample > self.config.play_epsilon and not random_flag:
-            return torch.argmax(self.Q_table[self.state])
+            return argmax(self.Q_table[self.state])
         else:
             return torch.tensor([[random.randrange(self.n_actions)]], device=self.device, dtype=torch.long)
-    
+
     def show(self):
         print(f'Q_table:\n{self.Q_table}\nYour action: {self.own_memory}\nOppo action: {self.opponent_memory}')
 
@@ -103,12 +99,9 @@ def decode_one_hot(state):
         decode = torch.tensor(decode)
     return decode.long()
         
-def inf_0(x):
-    # change -inf to 0
-    if x == float('-inf'):
-        return 0
-    else:
-        return x
+def argmax(x):
+    denominator = 1000000
+    return torch.argmax(x + torch.rand(x.shape[-1])/denominator)
 
 
 

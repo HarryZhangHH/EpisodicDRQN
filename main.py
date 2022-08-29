@@ -79,7 +79,7 @@ def main():
             print('You will use the strategy '+strategies[num])
             simulation.testStrategy(strategies, num, config)
         else:
-            print('You will use the strategy q-learning')
+            print('You will use the strategy '+strategies[num])
             simulation.rlSimulate(strategies, config)
 
     if choice == 2:
