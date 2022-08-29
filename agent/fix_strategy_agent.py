@@ -14,7 +14,7 @@ class StrategyAgent(AbstractAgent):
     def roll(self):
         return random.randint(0,1)
 
-    def act(self):
+    def act(self, oppo_agent):
         if self.name == 'ALLC':
             return 0
         elif self.name == 'ALLD':
@@ -22,20 +22,30 @@ class StrategyAgent(AbstractAgent):
         elif self.name == 'Random':
             return self.roll()
         elif self.name == 'Grudger':
-            if sum(self.opponent_memory) == 0:
+            low_bound = oppo_agent.play_times-self.config.h
+            if len(oppo_agent.own_memory) == 0:
                 return 0
+            elif low_bound < 0:
+                return clip(sum(oppo_agent.own_memory[:oppo_agent.play_times]))
             else:
-                return 1
+                return clip(sum(oppo_agent.own_memory[low_bound : oppo_agent.play_times]))
         elif self.name == 'TitForTat':
-            if len(self.opponent_memory) == 0:
+            if len(oppo_agent.own_memory) == 0:
                 return 0
             else:
-                return self.opponent_memory[-1]
+                return oppo_agent.own_memory[oppo_agent.play_times-1]
     
-    def update(self, reward, own_action, opponent_action):
+    def update(self, reward, own_action, opponent_action, oppo_agent):
         super(StrategyAgent, self).update(reward)
         self.own_memory.append(own_action)
         self.opponent_memory.append(opponent_action)
     
-
+    def show(self):
+        print(f'Your action: {self.own_memory}\nOppo action: {self.opponent_memory}')
+    
+def clip(x):
+    if x >= 1:
+        return 1
+    else:
+        return 0
     

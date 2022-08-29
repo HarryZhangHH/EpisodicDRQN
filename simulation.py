@@ -7,11 +7,17 @@ from env import Environment
 
 def play(agent1, agent2, rounds, env):
     for i in range(rounds):
-        a1, a2 = agent1.act(), agent2.act()
+        a1, a2 = agent1.act(agent2), agent2.act(agent1)
         episode, r1, r2 = env.step(a1, a2)
-        agent1.update(r1, a1, a2)
-        agent2.update(r2, a2, a1)
+        agent1.update(r1, a1, a2, agent2)
+        agent2.update(r2, a2, a1, agent1)
     return r1, r2
+
+def constructOpponent(name, config):
+    if name == 'QLearning':
+        return QLearningAgent(config)
+    else:
+        return StrategyAgent(name, config)
 
 def testStrategy(strategies, num, config):
     # construct env
@@ -19,7 +25,7 @@ def testStrategy(strategies, num, config):
     for s in strategies:
         agent1 = StrategyAgent(strategies[num], config)
         print('You opponent uses the strategy '+strategies[s])
-        agent2 = StrategyAgent(strategies[s], config)
+        agent2 = constructOpponent(strategies[s], config)
         play(agent1, agent2, config.n_episodes, env)
         print(f'Your action: {agent2.opponent_memory}\nOppo action:{agent2.own_memory}')
         print(f'Your score: {agent1.running_score}\nOpponent score: {agent2.running_score}')
@@ -30,12 +36,10 @@ def rlSimulate(strategies, config):
         print('You opponent uses the strategy '+strategies[s])
         env.reset()
         agent1 = QLearningAgent(config)
-        if strategies[s] == 'QLearning':
-            agent2 = QLearningAgent(config)
-        else:
-            agent2 = StrategyAgent(strategies[s], config)
+        agent2 = constructOpponent(strategies[s], config)
         play(agent1, agent2, config.n_episodes, env)
         agent1.show()
+        agent2.show()
         print(f'Your score: {agent1.running_score}\nOppo score: {agent2.running_score}')
 
 def multiSimulate(n_agents, strategies,config):
