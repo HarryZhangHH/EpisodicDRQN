@@ -6,7 +6,7 @@ import torch
 # --------------------------------------------------------------------------- #
 parser = argparse.ArgumentParser(description='Playground', prog='Prisoner dilemma simulation')
 parser.add_argument('--name', default=None, type=str, help='Name of the run, will be in the output file')
-parser.add_argument('--discount', default=0.95, type=float, help='Reward discount')
+parser.add_argument('--discount', default=0.95, type=float, help='Reward discount, range:(0,1]')
 parser.add_argument('--n_episodes', default=10, type=int, help='Number of episodes within a batch')
 parser.add_argument('--h', default=1, type=int, help='state amount')
 parser.add_argument('--play_epsilon', default=0.1, type=float, help='The greedy factor when each agent play the dilemma game')
@@ -67,9 +67,10 @@ def main():
     print('Here are your game options')
     print('press 1 to test an a strategy against all strategies')
     print('press 2 to play against a strategy of your choice ')
+    print('press 3 to play a N agents game')
     choice = int(input())
     choices = {'1-alwaysCooperate','2-alwaysDefect','3-titForTat','4-random','5-grudger','6-qlearning'}
-    strategies = {1:'ALLC',2:'ALLD',3:'TitForTat',4:'Random',5:'Grudger'}
+    strategies = {1:'ALLC',2:'ALLD',3:'TitForTat',4:'Random',5:'Grudger',6:'QLearning'}
 
     if choice == 1:
         print('here are the strategies, choose one\n', choices)
@@ -84,12 +85,16 @@ def main():
     if choice == 2:
         print('right now you are a q-learning agent, who do you want to play against')
         print(choices)
-        num = int(input('choose a strategy via number'))
-        strategy = strategies[num]
+        num = int(input('choose a strategy via number '))
         # rounds = int(input('how many rounds do you want to play:'))
         # if rounds > config.n_episodes:
         #     config.n_episodes = rounds
-        simulation.rlSimulate(strategy, config)
+        simulation.rlSimulate(dict({num: strategies[num]}), config)
+
+    if choice == 3:
+        print('how many agents to play')
+        n_agents = int(input())
+        simulation.multiSimulate(n_agents, strategies, config)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         

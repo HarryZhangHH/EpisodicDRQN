@@ -32,14 +32,10 @@ class StrategyAgent(AbstractAgent):
             else:
                 return self.opponent_memory[-1]
     
-    def update(self, reward, own_action, opponent_action, episode):
+    def update(self, reward, own_action, opponent_action):
         super(StrategyAgent, self).update(reward)
         self.own_memory.append(own_action)
         self.opponent_memory.append(opponent_action)
     
 
     
-
-
-    
-        

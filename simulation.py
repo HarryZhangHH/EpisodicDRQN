@@ -9,8 +9,9 @@ def play(agent1, agent2, rounds, env):
     for i in range(rounds):
         a1, a2 = agent1.act(), agent2.act()
         episode, r1, r2 = env.step(a1, a2)
-        agent1.update(r1, a1, a2, episode)
-        agent2.update(r2, a2, a1, episode)
+        agent1.update(r1, a1, a2)
+        agent2.update(r2, a2, a1)
+    return r1, r2
 
 def testStrategy(strategies, num, config):
     # construct env
@@ -29,23 +30,42 @@ def rlSimulate(strategies, config):
         print('You opponent uses the strategy '+strategies[s])
         env.reset()
         agent1 = QLearningAgent(config)
-        agent2 = StrategyAgent(strategies[s], config)
-        for i in range(config.n_episodes):
-            # the last h actions of the opponent
-            state = decode_one_hot(agent1.opponent_memory[i-1:i+agent1.h-1])
-            # state = torch.cat([agent1.own_memory[i:i+agent1.h], agent1.opponent_memory[i:i+agent1.h]], dim=1)
-            if i == 0:
-                # initialize state
-                a1 = random.randrange(agent1.n_actions)
-            elif i <= 2*(2**agent1.h)*agent1.n_actions:
-                a1 = int(agent1.select_action(state, True))
-            else:
-                a1 = int(agent1.select_action(state))
-            a2 = agent2.act()
-            episode, r1, r2 = env.step(a1, a2)
-            agent1.update(r1, a1, a2, episode)
-            agent2.update(r2, a2, a1, episode)
+        if strategies[s] == 'QLearning':
+            agent2 = QLearningAgent(config)
+        else:
+            agent2 = StrategyAgent(strategies[s], config)
+        play(agent1, agent2, config.n_episodes, env)
         agent1.show()
         print(f'Your score: {agent1.running_score}\nOppo score: {agent2.running_score}')
+
+def multiSimulate(n_agents, strategies,config):
+    env = Environment(config)
+    names = locals()
+    for n in range(n_agents):
+        s = random.randint(1,len(strategies))
+        if strategies[s] == 'QLearning':
+            names['n_' + str(n) ] = QLearningAgent(config)
+        else:
+            names['n_' + str(n) ] = StrategyAgent(strategies[s], config)
+        print(f'initialize Agent {n}', end=' ')
+        print(names.get('n_' + str(n)).name)  
+    # select opponent randomly
+    for i in range(config.h):
+        for n in range(n_agents):
+            m = n
+            while m == n:
+                m = random.randint(0, n_agents-1)
+            play(names.get('n_' + str(n)), names.get('n_' + str(m)), 1, env)
+            print(n, names.get('n_' + str(n)).name, names.get('n_' + str(n)).own_memory, names.get('n_' + str(n)).opponent_memory, end=' ')
+            print(m, names.get('n_' + str(m)).name, names.get('n_' + str(m)).own_memory, names.get('n_' + str(m)).opponent_memory)
+    # select using rl
+    for i in range(config.h, config.n_episodes):
+        state = torch.zeros((n_agents,config.h))
+        for n in range(n_agents):
+            i = names.get('n_' + str(n)).play_times
+            state[n,:] = torch.as_tensor(names.get('n_' + str(n)).own_memory[i-config.h:i])
+        for n in range(n_agents):
+            new_state = state[torch.arange(0, state.shape[0]) != n, ...]
+            # select_opponent(new_state)
 
 

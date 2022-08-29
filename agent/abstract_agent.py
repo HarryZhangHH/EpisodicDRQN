@@ -8,12 +8,14 @@ class AbstractAgent():
     def __init__(self, config):
         self.config = config
         self.running_score = 0.0
+        self.play_times = 0
     
     def act(self):
         pass
 
     def update(self, reward):
         self.running_score = reward + self.config.discount * self.running_score
+        self.play_times += 1
 
     """
     Process the results of a round. This provides an opportunity to store data 
