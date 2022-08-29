@@ -36,3 +36,6 @@ class Environment():
             r1, r2 = self.config.punishment, self.config.punishment
         
         return episode, r1, r2
+
+    def reset(self):
+        self.episode = 0

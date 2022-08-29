@@ -8,6 +8,7 @@ class StrategyAgent(AbstractAgent):
     def __init__(self, name, config):
         self.name = name
         super(StrategyAgent, self).__init__(config)
+        self.own_memory = []
         self.opponent_memory = []
         
     def roll(self):
@@ -31,13 +32,10 @@ class StrategyAgent(AbstractAgent):
             else:
                 return self.opponent_memory[-1]
     
-    def update(self, reward, opponent_action):
+    def update(self, reward, own_action, opponent_action):
         super(StrategyAgent, self).update(reward)
+        self.own_memory.append(own_action)
         self.opponent_memory.append(opponent_action)
     
 
     
-
-
-    
-        
