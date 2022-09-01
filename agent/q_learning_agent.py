@@ -6,6 +6,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from collections import namedtuple, deque
 from agent.abstract_agent import AbstractAgent
+from utils import argmax, decode_one_hot
 
 Transition = namedtuple('Transition', ['state','action','next_state','reward'])
 
@@ -43,12 +44,14 @@ class QLearningAgent(AbstractAgent):
         super(QLearningAgent, self).__init__(config)
         self.name = name
         self.n_actions = config.n_actions
-        self.own_memory = torch.zeros((config.n_episodes, ))
-        self.opponent_memory = torch.zeros((config.n_episodes, ))
+        self.own_memory = torch.zeros((config.n_episodes*10, ))
+        self.opponent_memory = torch.zeros((config.n_episodes*10, ))
         self.Q_table = torch.zeros((2**config.h, 2))
         # self.Q_table = torch.full((2**config.h, 2), float('-inf'))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.state = None
+        # for test
+        self.own_action = []
         
     # def build(self):
     #     self.policy_net = NeuralNetwork(self.h, self.n_actions).to(self.device)
@@ -71,8 +74,10 @@ class QLearningAgent(AbstractAgent):
             return int(self.select_action())
 
     
-    def update(self, reward, own_action, opponent_action, oppo_agent):
+    def update(self, reward, own_action, opponent_action):
         super(QLearningAgent, self).update(reward)
+        # test
+        self.own_action.append(int(own_action))
         self.own_memory[self.play_times-1] = own_action
         self.opponent_memory[self.play_times-1] = opponent_action
         if self.state is not None:
@@ -83,6 +88,7 @@ class QLearningAgent(AbstractAgent):
 
     def select_action(self, random_flag=False):
         sample = random.random()
+        # epsilon greedy policy
         if sample > self.config.play_epsilon and not random_flag:
             return argmax(self.Q_table[self.state])
         else:
@@ -91,17 +97,7 @@ class QLearningAgent(AbstractAgent):
     def show(self):
         print(f'Q_table:\n{self.Q_table}\nYour action: {self.own_memory}\nOppo action: {self.opponent_memory}')
 
-def decode_one_hot(state):
-    decode = 0
-    for i in range(state.shape[0]):
-        decode += state[i]*2**i
-    if type(decode) == int:
-        decode = torch.tensor(decode)
-    return decode.long()
-        
-def argmax(x):
-    denominator = 1000000
-    return torch.argmax(x + torch.rand(x.shape[-1])/denominator)
+
 
 
 

@@ -10,6 +10,7 @@ parser.add_argument('--discount', default=0.95, type=float, help='Reward discoun
 parser.add_argument('--n_episodes', default=10, type=int, help='Number of episodes within a batch')
 parser.add_argument('--h', default=1, type=int, help='state amount')
 parser.add_argument('--play_epsilon', default=0.1, type=float, help='The greedy factor when each agent play the dilemma game')
+parser.add_argument('--select_epsilon', default=0.1, type=float, help='The greedy factor when each agent select the opponent')
 parser.add_argument('--reward', default=3, type=float, help='')
 parser.add_argument('--temptation', default=5, type=float, help='')
 parser.add_argument('--sucker', default=0, type=float, help='')
@@ -22,7 +23,7 @@ class Config():
     def __init__(self, config):
         self.parse_config(**config)
     
-    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, alpha, n_actions, h):
+    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, alpha, n_actions, h):
         # game payoffs
         self.reward = reward
         self.sucker = sucker
@@ -31,6 +32,7 @@ class Config():
         self.n_episodes = n_episodes
         self.discount = discount
         self.play_epsilon = play_epsilon
+        self.select_epsilon = select_epsilon
         self.alpha = alpha
         self.n_actions = n_actions
         self.h = h
@@ -43,7 +45,8 @@ class Config():
             ' t=' + str(self.temptation) + \
             ' s=' + str(self.sucker) + \
             ' p=' + str(self.punishment) + \
-            ' epsilon=' + str(self.play_epsilon)
+            ' play_epsilon=' + str(self.play_epsilon) + \
+            ' select_epsilon=' + str(self.select_epsilon)
 
 
 def main():
@@ -57,6 +60,7 @@ def main():
         'n_episodes': args.n_episodes, 
         'discount': args.discount,
         'play_epsilon': args.play_epsilon,
+        'select_epsilon': args.select_epsilon,
         'alpha': args.alpha,
         'n_actions': 2,
         'h': args.h,
@@ -69,8 +73,8 @@ def main():
     print('press 2 to play against a strategy of your choice ')
     print('press 3 to play a N agents game')
     choice = int(input())
-    choices = {'1-alwaysCooperate','2-alwaysDefect','3-titForTat','4-random','5-grudger','6-qlearning'}
-    strategies = {1:'ALLC',2:'ALLD',3:'TitForTat',4:'Random',5:'Grudger',6:'QLearning'}
+    choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-qLearning'}
+    strategies = {0:'ALLC',1:'ALLD',2:'TitForTat',3:'revTitForTat',4:'Random',5:'Grudger',6:'QLearning'}
 
     if choice == 1:
         print('here are the strategies, choose one\n', choices)

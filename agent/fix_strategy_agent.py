@@ -33,12 +33,19 @@ class StrategyAgent(AbstractAgent):
             if len(oppo_agent.own_memory) == 0:
                 return 0
             else:
-                return oppo_agent.own_memory[oppo_agent.play_times-1]
+                return int(oppo_agent.own_memory[oppo_agent.play_times-1])
+        elif self.name == 'revTitForTat':
+            if len(oppo_agent.own_memory) == 0:
+                return 0
+            else:
+                return reverse(int(oppo_agent.own_memory[oppo_agent.play_times-1]))
     
-    def update(self, reward, own_action, opponent_action, oppo_agent):
+    def update(self, reward, own_action, opponent_action):
         super(StrategyAgent, self).update(reward)
         self.own_memory.append(own_action)
         self.opponent_memory.append(opponent_action)
+        # for test
+        self.own_action = self.own_memory
     
     def show(self):
         print(f'Your action: {self.own_memory}\nOppo action: {self.opponent_memory}')
@@ -47,5 +54,11 @@ def clip(x):
     if x >= 1:
         return 1
     else:
+        return 0
+
+def reverse(x):
+    if x == 0:
+        return 1
+    elif x == 1:
         return 0
     
