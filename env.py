@@ -16,6 +16,7 @@ class Environment():
     def __init__(self, config):
         self.config = config
         self.episode = 0
+        self.running_score = 0.0
     
     def step(self, a1, a2):
         """
@@ -37,5 +38,9 @@ class Environment():
         
         return episode, r1, r2
 
+    def update(self, reward):
+        self.running_score = reward + self.config.discount * self.running_score
+
     def reset(self):
         self.episode = 0
+        self.running_score = 0.0
