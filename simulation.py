@@ -1,8 +1,9 @@
 import torch
 import random
 from agent.fix_strategy_agent import StrategyAgent
-from agent.q_learning_agent import QLearningAgent, SelectMemory
-from utils import decode_one_hot, argmax, iterate_combination
+from agent.tabluar_agent import TabularAgent
+from agent.dqn_agent import QLearningAgent, SelectMemory
+from utils import label_encode, argmax, iterate_combination, question
 from env import Environment
 
 def play(agent1, agent2, rounds, env):
@@ -14,34 +15,63 @@ def play(agent1, agent2, rounds, env):
     return r1, r2
 
 def constructOpponent(name, config):
-    if name == 'QLearning':
-        return QLearningAgent(config)
+    if 'Learning' in name:
+        return TabularAgent(name, config)
     else:
         return StrategyAgent(name, config)
 
-def testStrategy(strategies, num, config):
-    # construct env
+def testTransition(strategies, num, config):
+    discount = config.discount
+    config.discount = 1
     env = Environment(config)
     for s in strategies:
-        agent1 = StrategyAgent(strategies[num], config)
-        print('You opponent uses the strategy '+strategies[s])
+        agent1 = constructOpponent(strategies[num], config)
+        print('You opponent uses the strategy ' + strategies[s])
         agent2 = constructOpponent(strategies[s], config)
-        play(agent1, agent2, config.n_episodes, env)
-        print(f'Your action: {agent2.opponent_memory}\nOppo action:{agent2.own_memory}')
-        print(f'Your score: {agent1.running_score}\nOpponent score: {agent2.running_score}')
+        play(agent1, agent2, 1, env)
+        while True:
+            prob = torch.rand(1)
+            if prob <= discount:
+                play(agent1, agent2, 1, env)
+            else:
+                break
+        print(f'Playing times: {agent1.play_times}. Discount: {config.discount}')
+        print(f'Your action: {agent2.opponent_memory[:agent2.play_times]}\nOppo action:{agent2.own_memory[:agent2.play_times]}')
+        print(f'Your score: {agent1.running_score}\nOppo score: {agent2.running_score}')
+        if agent1.name == 'QLearning':
+            print(f'Your Q_table:\n{agent1.Q_table}')
+        if agent2.name == 'QLearning':
+            print(f'Oppo Q_table:\n{agent2.Q_table}')
+        print()
 
-def rlSimulate(strategies, config):
+def twoSimulate(strategies, num, config, delta = 0.0001):
+    converge = False
+    if 'Learning' in strategies[num]:
+        converge = question("Do you want to set the episode to infinity and it will stop automatically when policy converges")
     env = Environment(config)
     for s in strategies:
+        print("---------------------------------------------------------------------GAME---------------------------------------------------------------------")
+        print('You will use the strategy ' + strategies[num])
         print('You opponent uses the strategy '+strategies[s])
         env.reset()
-        agent1 = QLearningAgent(config)
+        agent1 = constructOpponent(strategies[num], config)
         agent2 = constructOpponent(strategies[s], config)
-        play(agent1, agent2, config.n_episodes, env)
+        if converge:
+            Q_table = agent1.Q_table.clone()
+            while True:
+                play(agent1, agent2, 20*config.h, env)
+                if torch.sum(agent1.Q_table-Q_table) < delta:
+                    break
+                Q_table = agent1.Q_table.clone()
+        else:
+            play(agent1, agent2, config.n_episodes, env)
         agent1.show()
         agent2.show()
         print(f'Your score: {agent1.running_score}\nOppo score: {agent2.running_score}')
+        print("----------------------------------------------------------------------------------------------------------------------------------------------")
+        print()
 
+# benchmark
 def multiSimulate(n_agents, strategies, config, selection_method='ALLQRL'):
     """
     Multi-agent simulation
@@ -110,7 +140,7 @@ def multiSimulate(n_agents, strategies, config, selection_method='ALLQRL'):
             for n in range(n_agents):
                 t = names.get('n_' + str(n)).play_times
                 action_hist[n,:] = torch.as_tensor(names.get('n_' + str(n)).own_memory[t-config.h:t])
-            action_hist = decode_one_hot(action_hist.T)
+            action_hist = label_encode(action_hist.T)
             for n in range(n_agents):
                 # select the agent
                 state_encode = action_hist[torch.arange(0, action_hist.shape[0]) != n, ...]
@@ -151,7 +181,7 @@ def multiSimulate(n_agents, strategies, config, selection_method='ALLQRL'):
             for n in range(n_agents):
                 t = names.get('n_' + str(n)).play_times
                 action_hist[n,:] = torch.as_tensor(names.get('n_' + str(n)).own_memory[t-config.h:t])
-            action_hist = decode_one_hot(action_hist.T)
+            action_hist = label_encode(action_hist.T)
 
             for me in memory.memory:
                 state, action, reward, agent_idx = me[0], me[1], me[6], me[3]
