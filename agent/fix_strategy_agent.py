@@ -60,6 +60,11 @@ class StrategyAgent(AbstractAgent):
         self.opponent_memory.append(opponent_action)
         # for test
         self.own_action = self.own_memory
+
+    def reset(self):
+        super(StrategyAgent, self).reset()
+        self.own_memory = []
+        self.opponent_memory = []
     
     def show(self):
         print("==================================================")

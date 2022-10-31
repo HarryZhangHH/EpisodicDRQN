@@ -17,7 +17,8 @@ parser.add_argument('--reward', default=3, type=float, help='')
 parser.add_argument('--temptation', default=5, type=float, help='')
 parser.add_argument('--sucker', default=0, type=float, help='')
 parser.add_argument('--punishment', default=1, type=float, help='')
-parser.add_argument('--alpha', default=0.5, type=float, help='The alpha for Q_learning')
+parser.add_argument('--alpha', default=0.1, type=float, help='The alpha (learning rate) for RL learning')
+parser.add_argument('--state_repr', default='None', choices=[None, 'grudger'], help='The state reprsentation method; (None: only use the opponent h actions; grudger: count mad)')
 # parser.print_help()
 # --------------------------------------------------------------------------- #
 
@@ -25,7 +26,7 @@ class Config():
     def __init__(self, config):
         self.parse_config(**config)
     
-    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, epsilon_decay, min_epsilon, alpha, n_actions, h):
+    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, epsilon_decay, min_epsilon, alpha, n_actions, h, state_repr):
         # game payoffs
         self.reward = reward
         self.sucker = sucker
@@ -40,6 +41,7 @@ class Config():
         self.alpha = alpha
         self.n_actions = n_actions
         self.h = h
+        self.state_repr = state_repr
 
     def __repr__(self):
         return 'Configs: ' + ' episodes=' + str(self.n_episodes) + \
@@ -51,7 +53,8 @@ class Config():
             ' p=' + str(self.punishment) + \
             ' play_epsilon=' + str(self.play_epsilon) + \
             ' select_epsilon=' + str(self.select_epsilon) + \
-            ' epsilon_decay=' + str(self.epsilon_decay)
+            ' epsilon_decay=' + str(self.epsilon_decay) + \
+            ' state_repr=' + str(self.state_repr)
 
 
 def main():
@@ -71,24 +74,25 @@ def main():
         'alpha': args.alpha,
         'n_actions': 2,
         'h': args.h,
+        'state_repr': args.state_repr,
     }
     config = Config(config)
     print(config.__repr__)
     print('Here are your game options')
-    print('press 0 to test an a strategy against all strategies in geometric discount setting')
+    print('press 0 to generate a benchmark against all strategies in geometric discount setting')
     print('press 1 to test an a strategy against all strategies')
     print('press 2 to play against a strategy of your choice ')
     print('press 3 to play a N agents game')
     choice = int(input())
-    choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-mc','9-dqn'}
-    rl_choices = {'7-qLearning','8-mc','9-dqn'}
-    strategies = {0:'ALLC',1:'ALLD',2:'TitForTat',3:'revTitForTat',4:'Random',5:'Grudger',6:'Pavlov',7:'QLearning',8:'MCLearning'}
+    choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','9-dqn'}
+    rl_choices = {'7-qLearning','9-dqn'}
+    strategies = {0:'ALLC',1:'ALLD',2:'TitForTat',3:'revTitForTat',4:'Random',5:'Grudger',6:'Pavlov',7:'QLearning'}
 
     if choice == 0:
-        print('here are the strategies, choose one\n', choices)
-        num = int(input('choose a strategy via number '))
-        print('You will use the strategy ' + strategies[num])
-        simulation.testTransition(strategies, num, config)
+        # print('here are the strategies, choose one\n', choices)
+        # num = int(input('choose a strategy via number '))
+        # print('You will use the strategy ' + strategies[num])
+        simulation.benchmark(strategies, None, config)
 
     if choice == 1:
         print('here are the strategies, choose one\n', choices)

@@ -1,10 +1,12 @@
 import torch
 import random
+import numpy as np
 from agent.fix_strategy_agent import StrategyAgent
 from agent.tabluar_agent import TabularAgent
 from agent.dqn_agent import QLearningAgent, SelectMemory
 from utils import label_encode, argmax, iterate_combination, question
 from env import Environment
+import sys
 
 def play(agent1, agent2, rounds, env):
     for i in range(rounds):
@@ -20,34 +22,50 @@ def constructOpponent(name, config):
     else:
         return StrategyAgent(name, config)
 
-def testTransition(strategies, num, config):
+def benchmark(strategies, num, config):
+    # This benchmark is generated in the geometric setting using the first-visit Monte Carlo method
     discount = config.discount
     config.discount = 1
     env = Environment(config)
     for s in strategies:
-        agent1 = constructOpponent(strategies[num], config)
-        print('You opponent uses the strategy ' + strategies[s])
+        if 'Learning' in strategies[s]:
+            continue
+        agent1 = constructOpponent('MCLearning', config)
         agent2 = constructOpponent(strategies[s], config)
-        play(agent1, agent2, 1, env)
-        while True:
-            prob = torch.rand(1)
-            if prob <= discount:
-                play(agent1, agent2, 1, env)
-            else:
-                break
-        print(f'Playing times: {agent1.play_times}. Discount: {config.discount}')
-        print(f'Your action: {agent2.opponent_memory[:agent2.play_times]}\nOppo action:{agent2.own_memory[:agent2.play_times]}')
-        print(f'Your score: {agent1.running_score}\nOppo score: {agent2.running_score}')
-        if agent1.name == 'QLearning':
+        play_times_buffer = []
+        a1_running_score_buffer = []
+        a2_running_score_buffer = []
+        print('You are using the Monte Carlo method')
+        print('You opponent uses the strategy ' + strategies[s])
+        for i in range(config.n_episodes):
+            play(agent1, agent2, 1, env)
+            while True:
+                prob = torch.rand(1)
+                if prob <= discount:
+                    play(agent1, agent2, 1, env)
+                else:
+                    agent1.mc_update()
+                    break
+            play_times_buffer.append(agent1.play_times)
+            a1_running_score_buffer.append(agent1.running_score)
+            a2_running_score_buffer.append(agent2.running_score)
+            # print(f'Playing times: {agent1.play_times}. Discount: {config.discount}')
+            # print(f'Your action: {agent2.opponent_memory[:agent2.play_times]}\nOppo action:{agent2.own_memory[:agent2.play_times]}')
+            # print(f'Your score: {agent1.running_score}\nOppo score: {agent2.running_score}')
+            agent1.reset()
+            agent2.reset()
+        print(f'The average playing times: {np.mean(play_times_buffer)}, Your average score: {np.mean(a1_running_score_buffer)}, '
+              f'Your opponent average score: {np.mean(a2_running_score_buffer)}')
+        if 'Learning' in agent1.name:
             print(f'Your Q_table:\n{agent1.Q_table}')
-        if agent2.name == 'QLearning':
+        if 'Learning' in agent2.name:
             print(f'Oppo Q_table:\n{agent2.Q_table}')
         print()
 
 def twoSimulate(strategies, num, config, delta = 0.0001):
     converge = False
     if 'Learning' in strategies[num]:
-        converge = question("Do you want to set the episode to infinity and it will stop automatically when policy converges")
+        converge = question('Do you want to set the episode to infinity and it will stop automatically when policy converges')
     env = Environment(config)
     for s in strategies:
         print("---------------------------------------------------------------------GAME---------------------------------------------------------------------")

@@ -1,6 +1,8 @@
 import random
 import torch
-from utils import argmax
+from utils import argmax, label_encode
+from collections import namedtuple, deque
+
 import numpy as np
 class AbstractAgent():
     """ 
@@ -24,6 +26,10 @@ class AbstractAgent():
 
     __update = update
 
+    def reset(self):
+        self.running_score = 0.0
+        self.play_times = 0
+    __reset = reset
     """
     Process the results of a round. This provides an opportunity to store data 
     that preserves the memory of previous rounds.
@@ -65,3 +71,43 @@ class AbstractAgent():
 
         def set_epsilon(self, epsilon):
             self.epsilon = epsilon
+
+    class StateRepr(object):
+        """
+        State representation, feature construction
+        """
+        def __init__(self, method=None, mad_threshold=1):
+            self.state = None
+            self.next_state = None
+            self.method = method
+            self.mad_threshold = mad_threshold
+            self.mad = False
+            self.oppo_memory = torch.zeros((1,))
+
+        def state_repr(self, oppo_action, own_action=None):
+            self.check_mad()
+            state_emb = label_encode(oppo_action)
+            if self.method == 'grudger':
+                state_emb += 2**len(oppo_action)*self.mad
+            return state_emb
+
+        def check_mad(self):
+            if int(torch.sum(self.oppo_memory)) > self.mad_threshold:
+                self.mad = True
+
+        def len(self):
+            if self.method == 'grudger':
+                return 2
+            return 1
+
+Transition = namedtuple('Transition', ['state','action','next_state','reward'])
+class ReplayBuffer(object):
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.memory = deque([],maxlen=capacity)
+    def push(self, *args):
+        self.memory.append(Transition(*args))
+    def clean(self):
+        self.memory = deque([],maxlen=self.capacity)
+    def __len__(self):
+        return len(self.memory)
