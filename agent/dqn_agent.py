@@ -9,51 +9,25 @@ from agent.abstract_agent import AbstractAgent
 from utils import argmax, label_encode
 
 Transition = namedtuple('Transition', ['state','action','next_state','reward'])
-Agent = namedtuple('Agent', ['state', 'action', 'agent_1', 'agent_2', 'action_1', 'action_2', 'reward_1', 'reward_2'])
-
-class SelectMemory(object):
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.memory = deque([],maxlen=capacity)
-    def push(self, *args):
-        self.memory.append(Agent(*args))
-    def clean(self):
-        self.memory = deque([],maxlen=self.capacity)
-    def __len__(self):
-        return len(self.memory)
-
-class ReplayMemory(object):
-    def __init__(self, capacity):
-        self.memory = deque([],maxlen=capacity)
-    def push(self, *args):
-        self.memory.append(Transition(*args))
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
-    def __len__(self):
-        return len(self.memory)
-
 
 class NeuralNetwork(nn.Module):
 
-    def __init__(self, h, outputs):
+    def __init__(self, h, outputs, num_hidden=128):
         super(NeuralNetwork, self).__init__()
-        self.flatten = nn.Flatten()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(2*h, 256),  # hidden layer
+            nn.Linear(2*h, num_hidden),  # hidden layer
             nn.ReLU(),
-            nn.Linear(256, outputs)
+            nn.Linear(num_hidden, outputs)
         )
     
     def forward(self, x):
-        x = self.flatten(x)
         logits = self.linear_relu_stack(x)
         return logits
-        
 
-class QLearningAgent(AbstractAgent):
+class DQNAgent(AbstractAgent):
     # h is every agents' most recent h actions are visiable to others which is composed to state
     def __init__(self, config, name='QLearning'):
-        super(QLearningAgent, self).__init__(config)
+        super(DQNAgent, self).__init__(config)
         self.name = name
         self.n_actions = config.n_actions
         self.own_memory = torch.zeros((config.n_episodes*1000, ))

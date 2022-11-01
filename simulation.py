@@ -2,8 +2,8 @@ import torch
 import random
 import numpy as np
 from agent.fix_strategy_agent import StrategyAgent
-from agent.tabluar_agent import TabularAgent
-from agent.dqn_agent import QLearningAgent, SelectMemory
+from agent.tabluar_agent import TabularAgent, SelectMemory
+from agent.dqn_agent import DQNAgent
 from utils import label_encode, argmax, iterate_combination, question
 from env import Environment
 import sys

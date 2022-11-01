@@ -19,6 +19,7 @@ parser.add_argument('--sucker', default=0, type=float, help='')
 parser.add_argument('--punishment', default=1, type=float, help='')
 parser.add_argument('--alpha', default=0.1, type=float, help='The alpha (learning rate) for RL learning')
 parser.add_argument('--state_repr', default='None', choices=[None, 'grudger'], help='The state reprsentation method; (None: only use the opponent h actions; grudger: count mad)')
+parser.add_argument('--batch_size', default=64, help='The bathc size for Neural Network')
 # parser.print_help()
 # --------------------------------------------------------------------------- #
 
@@ -26,7 +27,7 @@ class Config():
     def __init__(self, config):
         self.parse_config(**config)
     
-    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, epsilon_decay, min_epsilon, alpha, n_actions, h, state_repr):
+    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, epsilon_decay, min_epsilon, alpha, n_actions, h, state_repr, bathc_szie):
         # game payoffs
         self.reward = reward
         self.sucker = sucker
@@ -42,6 +43,7 @@ class Config():
         self.n_actions = n_actions
         self.h = h
         self.state_repr = state_repr
+        self.batch_size = bathc_szie
 
     def __repr__(self):
         return 'Configs: ' + ' episodes=' + str(self.n_episodes) + \
@@ -75,6 +77,7 @@ def main():
         'n_actions': 2,
         'h': args.h,
         'state_repr': args.state_repr,
+        'batch_size': args.batch_size,
     }
     config = Config(config)
     print(config.__repr__)

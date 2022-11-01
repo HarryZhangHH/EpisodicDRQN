@@ -23,6 +23,7 @@ class StrategyAgent(AbstractAgent):
             return self.roll()
         elif self.name == 'Grudger':
             low_bound = oppo_agent.play_times-self.config.h
+            low_bound = 0
             if oppo_agent.play_times == 0:
                 return 0
             elif low_bound < 0:
