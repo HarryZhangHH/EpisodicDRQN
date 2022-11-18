@@ -1,6 +1,18 @@
 import itertools
 import torch
 import numpy as np
+import os, sys
+import random
+class HiddenPrints:
+    """
+    To prevent a function from printing
+    """
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
 
 def question(q):
     i = 0
@@ -28,8 +40,8 @@ def label_encode(state):
     elif type(state) is np.ndarray or torch.is_tensor(state):
         for i in range(state.shape[0]):
             decode += state[i]*2**i
-    if type(decode) == int:
-        decode = torch.tensor(decode)
+    # if type(decode) == int:
+    decode = torch.as_tensor(decode)
     return decode.long()
         
 def argmax(x):
@@ -50,3 +62,11 @@ def iterate_combination(n):
         iter.extend(list(itertools.combinations(idx,i)))
     return iter
 
+def seed_everything(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    # env.seed(seed)
