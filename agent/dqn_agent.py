@@ -6,16 +6,19 @@ import torch.optim as optim
 import torch.nn.functional as F
 from collections import namedtuple, deque
 from agent.abstract_agent import AbstractAgent
-from utils import argmax, label_encode
+from itertools import count
+from utils import *
 
-Transition = namedtuple('Transition', ['state','action','next_state','reward'])
+MADTHRESHOLD = 5
+TARGET_UPDATE = 10
 
 class NeuralNetwork(nn.Module):
 
-    def __init__(self, h, outputs, num_hidden=128):
+    def __init__(self, inputs, outputs, num_hidden=128):
         super(NeuralNetwork, self).__init__()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(2*h, num_hidden),  # hidden layer
+            nn.Linear(inputs, num_hidden),  # hidden layer
+            nn.BatchNorm1d(num_hidden),
             nn.ReLU(),
             nn.Linear(num_hidden, outputs)
         )
@@ -26,66 +29,146 @@ class NeuralNetwork(nn.Module):
 
 class DQNAgent(AbstractAgent):
     # h is every agents' most recent h actions are visiable to others which is composed to state
-    def __init__(self, config, name='QLearning'):
+    def __init__(self, name, config):
+        """
+
+        Parameters
+        ----------
+        config
+        name = DQN
+        """
         super(DQNAgent, self).__init__(config)
         self.name = name
         self.n_actions = config.n_actions
         self.own_memory = torch.zeros((config.n_episodes*1000, ))
         self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
-        self.Q_table = torch.zeros((2**config.h, 2))
-        # self.Q_table = torch.full((2**config.h, 2), float('-inf'))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.state = None
-        # for test
-        self.own_action = []
         self.play_epsilon = config.play_epsilon
-        
-    # def build(self):
-    #     self.policy_net = NeuralNetwork(self.h, self.n_actions).to(self.device)
-        # target_net = NeuralNetwork(self.config, self.n_actions).to(self.device)
-        # target_net.load_state_dict(policy_net.state_dict())
-        # target_net.eval()
-        # memory = ReplayMemory(10000)
+        self.State = self.StateRepr(method=config.state_repr)
+        state_shape = config.h if config.state_repr=='uni' else config.h*2 if config.state_repr=='bi' else 1
+        self.build(state_shape)
+        self.loss = []
+
+    def build(self, state_shape):
+        """State, Policy, Memory, Q are objects"""
+        self.Policy_net = NeuralNetwork(state_shape, self.n_actions)  # an object
+        self.Target_net = NeuralNetwork(state_shape, self.n_actions)  # an object
+        self.Target_net.load_state_dict(self.Policy_net.state_dict())
+        print(self.Target_net.eval())
+        self.Policy = self.EpsilonPolicy(self.Policy_net, self.play_epsilon, self.config.n_actions)  # an object
+        self.Memory = self.ReplayBuffer(10000)  # an object
+        self.Optimizer = torch.optim.Adam(self.Policy_net.parameters(), lr=self.config.learning_rate)
 
     def act(self, oppo_agent):
-        # n_random = (2**self.config.h)*self.n_actions
-        n_random = self.config.h
-        # the last h actions of the opponent
-        # self.state = decode_one_hot(self.opponent_memory[self.play_times-self.h : self.play_times])
-        self.opponent_action = torch.as_tensor(oppo_agent.own_memory[oppo_agent.play_times-self.config.h : oppo_agent.play_times])
-        self.state = label_encode(self.opponent_action)
-        if self.play_times < self.config.h:
-            self.state = None
-        if self.play_times < n_random:
-            return int(self.select_action(True))
-        else:
-            return int(self.select_action())
+        """
+        Agent act based on the oppo_agent's information
+        Parameters
+        ----------
+        oppo_agent: object
 
-    
-    def update(self, reward, own_action, opponent_action):
-        super(QLearningAgent, self).update(reward)
-        # test
-        self.own_action.append(int(own_action))
-        self.own_memory[self.play_times-1] = own_action
-        self.opponent_memory[self.play_times-1] = opponent_action
+        Returns
+        -------
+        action index
+        """
+        # get opponent's last h move
+        self.opponent_action = torch.as_tensor(
+            oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
+        self.own_action = torch.as_tensor(
+            self.own_memory[self.play_times - self.config.h: self.play_times])
+
+        if self.play_times >= self.config.h:
+            self.State.state = self.State.state_repr(self.opponent_action, self.own_action)
+        return int(self.select_action())
+
+    def select_action(self):
+        # selection action based on epsilon greedy policy
+        a = self.Policy.sample_action(self.State.state)
+
+        # epsilon decay
         if self.play_epsilon > self.config.min_epsilon:
             self.play_epsilon *= self.config.epsilon_decay
-        if self.state is not None:
-            self.next_state = label_encode(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]))
-            # Q learning
-            self.Q_table[self.state, own_action] = self.Q_table[self.state, own_action] + self.config.alpha* \
-                                                   (reward + self.config.discount*(torch.max(self.Q_table[self.next_state])) - self.Q_table[self.state, own_action])
+        self.Policy.set_epsilon(self.play_epsilon)
+        return a
 
-    def select_action(self, random_flag=False):
-        sample = random.random()
-        # epsilon greedy policy
-        if sample > self.play_epsilon and not random_flag:
-            return argmax(self.Q_table[self.state])
-        else:
-            return torch.tensor([[random.randrange(self.n_actions)]], device=self.device, dtype=torch.long)
+    def update(self, reward, own_action, opponent_action):
+        super(DQNAgent, self).update(reward)
+        self.own_memory[self.play_times - 1] = own_action
+        self.opponent_memory[self.play_times - 1] = opponent_action
+        self.State.oppo_memory = self.opponent_memory[:self.play_times]
+
+        if self.State.state is not None:
+            self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
+                                                          torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
+            # push the transition into ReplayBuffer
+            self.Memory.push(self.State.state, own_action, self.State.next_state, reward)
+            self.optimize_model()
+            # Update the target network, copying all weights and biases in DQN
+            if self.play_times % TARGET_UPDATE == 0:
+                self.Target_net.load_state_dict(self.Policy_net.state_dict())
+
+
+    def optimize_model(self):
+        """ Train our model """
+        def compute_q_vals(Q, states, actions):
+            """
+            This method returns Q values for given state action pairs.
+
+            Args:
+                Q: Q-net  (object)
+                states: a tensor of states. Shape: batch_size x obs_dim
+                actions: a tensor of actions. Shape: Shape: batch_size x 1
+            Returns:
+                A torch tensor filled with Q values. Shape: batch_size x 1.
+            """
+            return torch.gather(Q(states), 1, actions)
+        def compute_targets(Q, rewards, next_states, discount_factor):
+            """
+            This method returns targets (values towards which Q-values should move).
+
+            Args:
+                Q: Q-net  (object)
+                rewards: a tensor of rewards. Shape: Shape: batch_size x 1
+                next_states: a tensor of states. Shape: batch_size x obs_dim
+                discount_factor: discount
+            Returns:
+                A torch tensor filled with target values. Shape: batch_size x 1.
+            """
+            return rewards + discount_factor * torch.max(Q(next_states), 1)[0].reshape((-1, 1))
+
+        # don't learn without some decent experience
+        if len(self.Memory.memory) < self.config.batch_size:
+            return None
+        # random transition batch is taken from experience replay memory
+        transitions = self.Memory.sample(self.config.batch_size)
+        # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
+        state, action, next_state, reward = zip(*transitions)
+        # convert to PyTorch and define types
+        state = torch.stack(list(state), dim=0).to(self.device)
+        action = torch.tensor(action, dtype=torch.int64, device=self.device)[:, None]  # Need 64 bit to use them as index
+        next_state = torch.stack(list(next_state), dim=0).to(self.device)
+        reward = torch.tensor(reward, dtype=torch.float, device=self.device)[:, None]
+        # compute the q value
+        q_val = compute_q_vals(self.Policy_net, state, action)
+        with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
+            target = compute_targets(self.Target_net, reward, next_state, self.config.discount)
+
+        # loss is measured from error between current and newly expected Q values
+        loss = F.smooth_l1_loss(q_val, target)
+        # backpropagation of loss to Neural Network (PyTorch magic)
+        self.Optimizer.zero_grad()
+        loss.backward()
+        for param in self.Policy_net.parameters():
+            param.grad.data.clamp_(-1, 1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
+        self.Optimizer.step()
+        self.loss.append(loss.item())
+        # test
+        # print(f'==================={self.play_times}===================')
+        # print(f'transition: \n{np.hstack((state.numpy(),action.numpy(),next_state.numpy(),reward.numpy()))}')
+        # print(f'transition: \nstate: {np.squeeze(state.numpy())}\naction: {np.squeeze(action.numpy())}\nnext_s: {np.squeeze(next_state.numpy())}\nreward: {np.squeeze(reward.numpy())}')
+        # print(f'loss: {loss.item()}')
 
     def show(self):
-        print(f'Q_table:\n{self.Q_table}\nYour action: {self.own_memory[:self.play_times]}\nOppo action: {self.opponent_memory[:self.play_times]}')
+        print(f'Your action: {self.own_memory[self.play_times-20:self.play_times]}\nOppo action: {self.opponent_memory[self.play_times-20:self.play_times]}')
 
 
 

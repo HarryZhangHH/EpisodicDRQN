@@ -3,6 +3,7 @@ import torch
 from utils import argmax, label_encode
 from collections import namedtuple, deque
 import numpy as np
+Transition = namedtuple('Transition', ['state','action','next_state','reward'])
 class AbstractAgent():
     """ 
     Abstract an agent (superclass)
@@ -47,6 +48,11 @@ class AbstractAgent():
         A simple epsilon greedy policy.
         """
         def __init__(self, Q, epsilon, n_actions):
+            """
+            Parameters
+            ----------
+            Q: can be a tensor or a object (Neural Network)
+            """
             self.Q = Q
             self.epsilon = epsilon
             self.n_actions = n_actions
@@ -64,7 +70,11 @@ class AbstractAgent():
                 return random.randint(0, self.n_actions-1)
             prob = random.random()
             if prob > self.epsilon:
-                a = argmax(self.Q[obs])
+                if torch.is_tensor(self.Q):
+                    a = argmax(self.Q[obs])
+                else:
+                    self.Q.eval()
+                    a = argmax(self.Q(obs[None]))
             else:
                 a = random.randint(0, self.n_actions-1)
             return a
@@ -88,7 +98,7 @@ class AbstractAgent():
             self.mad = False
             self.oppo_memory = torch.zeros((1,))
 
-        def state_repr(self, oppo_action, own_action=None):
+        def state_repr(self, oppo_action, own_action=None, reward=None):
             """
             This method takes the opponent action and your own action as input and return an encoded state
 
@@ -97,11 +107,21 @@ class AbstractAgent():
                 own_action: own recent h actions (float tensor)
 
             Returns:
-                An encoded state representation (int).
+                An encoded state representation (float tensor).
             """
             self.check_mad()
             state_emb = label_encode(oppo_action)
-            if self.method == 'grudger':
+            if 'uni' in self.method:
+                state_emb = oppo_action.float()
+            if 'bi' in self.method:
+                assert own_action is not None, 'Make sure you input valid own_action in ui representation'
+                state_emb = torch.cat((oppo_action.float(), own_action.float()))
+            if 'reward' in self.method:
+                assert reward is not None, 'Make sure you input valid reward in ui representation'
+                state_emb = torch.cat((state_emb, reward))
+            if 'label' in self.method:
+                state_emb = label_encode(oppo_action)
+            if self.method == 'grudgerlabel':
                 state_emb += 2**len(oppo_action)*self.mad
             return state_emb
         def check_mad(self):
@@ -115,24 +135,24 @@ class AbstractAgent():
                 return 2
             return 1
 
-Transition = namedtuple('Transition', ['state','action','next_state','reward'])
-class ReplayBuffer(object):
-    """
-    A replay buffer using by MC and Q-Network to store transition
-    ----------
-    Args:
-        capacity: the capacit of replay buffer (int)
-    """
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.memory = deque([],maxlen=capacity)
-    def push(self, *args):
-        self.memory.append(Transition(*args))
-        if len(self.memory) > self.capacity:
-            self.memory = self.memory[1:]
-    def clean(self):
-        self.memory = deque([],maxlen=self.capacity)
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
-    def __len__(self):
-        return len(self.memory)
+    class ReplayBuffer(object):
+        """
+        A replay buffer using by MC and Q-Network to store transition
+        ----------
+        Args:
+            capacity: the capacit of replay buffer (int)
+        """
+        def __init__(self, capacity):
+            self.capacity = capacity
+            self.memory = deque([],maxlen=capacity)
+        def push(self, *args):
+            """Save a transition"""
+            self.memory.append(Transition(*args))
+            if len(self.memory) > self.capacity:
+                self.memory = self.memory[1:]
+        def clean(self):
+            self.memory = deque([],maxlen=self.capacity)
+        def sample(self, batch_size):
+            return random.sample(self.memory, batch_size)
+        def __len__(self):
+            return len(self.memory)
