@@ -114,11 +114,11 @@ class AbstractAgent():
             if 'uni' in self.method:
                 state_emb = oppo_action.float()
             if 'bi' in self.method:
-                assert own_action is not None, 'Make sure you input valid own_action in ui representation'
+                assert own_action is not None, 'Make sure you input valid own_action in bi representation'
                 state_emb = torch.cat((oppo_action.float(), own_action.float()))
             if 'reward' in self.method:
-                assert reward is not None, 'Make sure you input valid reward in ui representation'
-                state_emb = torch.cat((state_emb, reward))
+                assert reward is not None, 'Make sure you input valid reward in representation'
+                state_emb = torch.cat((state_emb, torch.FloatTensor([reward])))
             if 'label' in self.method:
                 state_emb = label_encode(oppo_action)
             if self.method == 'grudgerlabel':

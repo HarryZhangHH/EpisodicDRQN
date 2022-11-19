@@ -1,10 +1,11 @@
 import torch
 import random
 import numpy as np
+import matplotlib.pyplot as plt
 from agent.fix_strategy_agent import StrategyAgent
 from agent.tabluar_agent import TabularAgent, SelectMemory
 from agent.dqn_agent import DQNAgent
-from utils import label_encode, argmax, iterate_combination, question
+from utils import label_encode, argmax, iterate_combination, question, seed_everything
 from env import Environment
 import sys
 
@@ -19,6 +20,8 @@ def play(agent1, agent2, rounds, env):
 def constructOpponent(name, config):
     if 'Learning' in name:
         return TabularAgent(name, config)
+    elif 'DQN' in name:
+        return DQNAgent(name, config)
     else:
         return StrategyAgent(name, config)
 
@@ -27,6 +30,7 @@ def benchmark(strategies, num, config):
     discount = config.discount
     config.discount = 1
     env = Environment(config)
+    Q_table_list = []   # for test
     for s in strategies:
         if 'Learning' in strategies[s]:
             continue
@@ -61,9 +65,12 @@ def benchmark(strategies, num, config):
         if 'Learning' in agent2.name:
             print(f'Oppo Q_table:\n{agent2.Q_table}')
         print()
+        Q_table_list.append(agent1.Q_table)
+    return Q_table_list
 
 def twoSimulate(strategies, num, config, delta = 0.0001):
     converge = False
+    seed_everything()
     if 'Learning' in strategies[num]:
         converge = question('Do you want to set the episode to infinity and it will stop automatically when policy converges')
     env = Environment(config)
@@ -83,14 +90,29 @@ def twoSimulate(strategies, num, config, delta = 0.0001):
                 Q_table = agent1.Q_table.clone()
         else:
             play(agent1, agent2, config.n_episodes, env)
+        if 'DQN' in agent1.name:
+            print(len(agent1.loss), np.mean(agent1.loss[::2]), np.mean(agent1.loss[::20]), np.mean(agent1.loss[::100]))
+            plt.plot(agent1.loss[::20])
+            plt.title(f'agent1: {agent1.name}')
+            plt.show()
+        if 'DQN' in agent2.name:
+            print(len(agent2.loss), np.mean(agent2.loss[::2]), np.mean(agent2.loss[::20]), np.mean(agent2.loss[::100]))
+            plt.plot(agent2.loss[::20])
+            plt.title(f'agent:{agent2.name}')
+            plt.show()
         agent1.show()
         agent2.show()
         print(f'Your score: {agent1.running_score}\nOppo score: {agent2.running_score}')
         print("----------------------------------------------------------------------------------------------------------------------------------------------")
         print()
+        # print(agent1.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')), agent1.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))
+        # if agent2.name == 'DQN':
+        #     print(agent2.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')),
+        #           agent2.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))
+
 
 # benchmark
-def multiSimulate(n_agents, strategies, config, selection_method='ALLQRL'):
+def multiBenchmark(n_agents, strategies, config, selection_method='ALLQRL'):
     """
     Multi-agent simulation
     Parameters
@@ -110,7 +132,7 @@ def multiSimulate(n_agents, strategies, config, selection_method='ALLQRL'):
     names = locals()
     for n in range(n_agents):
         if 'ALLQ' in selection_method:
-            s = names['n_' + str(n)] = QLearningAgent(config)
+            s = names['n_' + str(n)] = TabularAgent('QLearning', config)
         elif 'FIX' in selection_method:
             s = n%len(strategies)
             names['n_' + str(n)] = constructOpponent(strategies[s], config)
@@ -211,7 +233,7 @@ def multiSimulate(n_agents, strategies, config, selection_method='ALLQRL'):
     for n in range(n_agents):
         print('Agent{}: name:{} final score:{} play time:{} times to play D:{}'
             .format(n, names.get('n_' + str(n)).name, names.get('n_' + str(n)).running_score, 
-            len(names.get('n_' + str(n)).own_action), names.get('n_' + str(n)).own_action.count(1)))
+            len(names.get('n_' + str(n)).own_memory[:names.get('n_' + str(n)).play_times]), list(names.get('n_' + str(n)).own_memory[:names.get('n_' + str(n)).play_times]).count(1)))
     print('The reward for total society: {}'.format(env.running_score))
 
 

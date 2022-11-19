@@ -39,14 +39,15 @@ class TabularAgent(AbstractAgent):
         Q_table: a tensor (matrix) storing Q values of each state-action pair
         """
         super(TabularAgent, self).__init__(config)
-        assert 'label' in config.state_repr, 'Note that tabular method can only use the label encoded state representation'
+        # assert 'label' in config.state_repr, 'Note that tabular method can only use the label encoded state representation'
         self.config = config
         self.name = name
+        self.h = min(3,config.h)
         self.n_actions = config.n_actions
         self.own_memory = torch.zeros((config.n_episodes * 1000,))
         self.opponent_memory = torch.zeros((config.n_episodes * 1000,))
-        self.State = self.StateRepr(method=config.state_repr, mad_threshold=MADTHRESHOLD)              # an object
-        self.Q_table = torch.zeros((2 ** config.h * self.State.len(), 2))
+        self.State = self.StateRepr(method='unilabel', mad_threshold=MADTHRESHOLD)              # an object
+        self.Q_table = torch.zeros((2 ** self.h * self.State.len(), 2))
         # self.Q_table = torch.full((2**config.h, 2), float('-inf'))
         self.play_epsilon = config.play_epsilon
         self.Policy = self.EpsilonPolicy(self.Q_table, self.play_epsilon, self.config.n_actions)            # an object
@@ -65,9 +66,11 @@ class TabularAgent(AbstractAgent):
         """
         # get opponent's last h move
         self.opponent_action = torch.as_tensor(
-            oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
+            oppo_agent.own_memory[oppo_agent.play_times - self.h: oppo_agent.play_times])
+        self.own_action = torch.as_tensor(
+            self.own_memory[self.play_times - self.config.h: self.play_times])
         # label encode
-        if self.play_times >= self.config.h:
+        if self.play_times >= self.h:
             self.State.state = self.State.state_repr(self.opponent_action)
         return int(self.select_action())
 

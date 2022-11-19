@@ -56,7 +56,7 @@ class DQNAgent(AbstractAgent):
         self.Target_net.load_state_dict(self.Policy_net.state_dict())
         print(self.Target_net.eval())
         self.Policy = self.EpsilonPolicy(self.Policy_net, self.play_epsilon, self.config.n_actions)  # an object
-        self.Memory = self.ReplayBuffer(10000)  # an object
+        self.Memory = self.ReplayBuffer(100)  # an object
         self.Optimizer = torch.optim.Adam(self.Policy_net.parameters(), lr=self.config.learning_rate)
 
     def act(self, oppo_agent):

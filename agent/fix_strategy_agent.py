@@ -59,8 +59,7 @@ class StrategyAgent(AbstractAgent):
         super(StrategyAgent, self).update(reward)
         self.own_memory.append(own_action)
         self.opponent_memory.append(opponent_action)
-        # for test
-        self.own_action = self.own_memory
+        self.own_action = own_action
 
     def reset(self):
         super(StrategyAgent, self).reset()

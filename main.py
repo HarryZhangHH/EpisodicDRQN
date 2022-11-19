@@ -18,8 +18,9 @@ parser.add_argument('--temptation', default=5, type=float, help='')
 parser.add_argument('--sucker', default=0, type=float, help='')
 parser.add_argument('--punishment', default=1, type=float, help='')
 parser.add_argument('--alpha', default=0.1, type=float, help='The alpha (learning rate) for RL learning')
-parser.add_argument('--state_repr', default='None', choices=[None, 'grudger'], help='The state reprsentation method; (None: only use the opponent h actions; grudger: count mad)')
+parser.add_argument('--state_repr', default='unilabel', choices=[None, 'uni', 'bi', 'unilabel', 'grudgerlabel', 'bireward'], help='The state reprsentation method; (None: only use the opponent h actions; grudger: count mad)')
 parser.add_argument('--batch_size', default=64, help='The bathc size for Neural Network')
+parser.add_argument('--learning_rate', default=1e-3, help='The learning rate for optimizing Neural Network')
 # parser.print_help()
 # --------------------------------------------------------------------------- #
 
@@ -27,7 +28,7 @@ class Config():
     def __init__(self, config):
         self.parse_config(**config)
     
-    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, epsilon_decay, min_epsilon, alpha, n_actions, h, state_repr, bathc_szie):
+    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, epsilon_decay, min_epsilon, alpha, n_actions, h, state_repr, batch_size, learning_rate):
         # game payoffs
         self.reward = reward
         self.sucker = sucker
@@ -43,7 +44,8 @@ class Config():
         self.n_actions = n_actions
         self.h = h
         self.state_repr = state_repr
-        self.batch_size = bathc_szie
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
 
     def __repr__(self):
         return 'Configs: ' + ' episodes=' + str(self.n_episodes) + \
@@ -78,6 +80,7 @@ def main():
         'h': args.h,
         'state_repr': args.state_repr,
         'batch_size': args.batch_size,
+        'learning_rate': args.learning_rate,
     }
     config = Config(config)
     print(config.__repr__)
@@ -87,9 +90,9 @@ def main():
     print('press 2 to play against a strategy of your choice ')
     print('press 3 to play a N agents game')
     choice = int(input())
-    choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','9-dqn'}
-    rl_choices = {'7-qLearning','9-dqn'}
-    strategies = {0:'ALLC',1:'ALLD',2:'TitForTat',3:'revTitForTat',4:'Random',5:'Grudger',6:'Pavlov',7:'QLearning'}
+    choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-dqn'}
+    rl_choices = {'7-qLearning','8-dqn'}
+    strategies = {0:'ALLC',1:'ALLD',2:'TitForTat',3:'revTitForTat',4:'Random',5:'Grudger',6:'Pavlov',7:'QLearning', 8:'DQN'}
 
     if choice == 0:
         # print('here are the strategies, choose one\n', choices)
@@ -117,7 +120,7 @@ def main():
     if choice == 3:
         print('how many agents to play')
         n_agents = int(input())
-        simulation.multiSimulate(n_agents, strategies, config)
+        simulation.multiBenchmark(n_agents, strategies, config)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
