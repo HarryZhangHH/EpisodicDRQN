@@ -2,7 +2,8 @@ import random
 from agent.abstract_agent import AbstractAgent
 
 class StrategyAgent(AbstractAgent):
-    """Abstract an agent
+    """
+    An agent using fixed strategy
     """
 
     def __init__(self, name, config):

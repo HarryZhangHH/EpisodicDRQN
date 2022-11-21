@@ -6,7 +6,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 from collections import namedtuple, deque
 from agent.abstract_agent import AbstractAgent
-from itertools import count
 from utils import *
 
 MADTHRESHOLD = 5
@@ -45,19 +44,19 @@ class DQNAgent(AbstractAgent):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.play_epsilon = config.play_epsilon
         self.State = self.StateRepr(method=config.state_repr)
-        state_shape = config.h if config.state_repr=='uni' else config.h*2 if config.state_repr=='bi' else 1
-        self.build(state_shape)
+        self.build()
         self.loss = []
 
-    def build(self, state_shape):
+    def build(self, input_size):
         """State, Policy, Memory, Q are objects"""
-        self.Policy_net = NeuralNetwork(state_shape, self.n_actions)  # an object
-        self.Target_net = NeuralNetwork(state_shape, self.n_actions)  # an object
-        self.Target_net.load_state_dict(self.Policy_net.state_dict())
-        print(self.Target_net.eval())
-        self.Policy = self.EpsilonPolicy(self.Policy_net, self.play_epsilon, self.config.n_actions)  # an object
+        input_size = self.config.h if self.config.state_repr=='uni' else self.config.h*2 if self.config.state_repr=='bi' else 1
+        self.PolicyNet = NeuralNetwork(input_size, self.n_actions) if self.name=='DQN' else None # an object
+        self.TargetNet = NeuralNetwork(input_size, self.n_actions) if self.name=='DQN' else None # an object
+        self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
+        print(self.TargetNet.eval())
+        self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
         self.Memory = self.ReplayBuffer(100)  # an object
-        self.Optimizer = torch.optim.Adam(self.Policy_net.parameters(), lr=self.config.learning_rate)
+        self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
 
     def act(self, oppo_agent):
         """
@@ -104,7 +103,7 @@ class DQNAgent(AbstractAgent):
             self.optimize_model()
             # Update the target network, copying all weights and biases in DQN
             if self.play_times % TARGET_UPDATE == 0:
-                self.Target_net.load_state_dict(self.Policy_net.state_dict())
+                self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
 
 
     def optimize_model(self):
@@ -148,16 +147,16 @@ class DQNAgent(AbstractAgent):
         next_state = torch.stack(list(next_state), dim=0).to(self.device)
         reward = torch.tensor(reward, dtype=torch.float, device=self.device)[:, None]
         # compute the q value
-        q_val = compute_q_vals(self.Policy_net, state, action)
+        q_val = compute_q_vals(self.PolicyNet, state, action)
         with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
-            target = compute_targets(self.Target_net, reward, next_state, self.config.discount)
+            target = compute_targets(self.TargetNet, reward, next_state, self.config.discount)
 
         # loss is measured from error between current and newly expected Q values
         loss = F.smooth_l1_loss(q_val, target)
         # backpropagation of loss to Neural Network (PyTorch magic)
         self.Optimizer.zero_grad()
         loss.backward()
-        for param in self.Policy_net.parameters():
+        for param in self.PolicyNet.parameters():
             param.grad.data.clamp_(-1, 1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
         self.Optimizer.step()
         self.loss.append(loss.item())
@@ -168,6 +167,7 @@ class DQNAgent(AbstractAgent):
         # print(f'loss: {loss.item()}')
 
     def show(self):
+        print("==================================================")
         print(f'Your action: {self.own_memory[self.play_times-20:self.play_times]}\nOppo action: {self.opponent_memory[self.play_times-20:self.play_times]}')
 
 
