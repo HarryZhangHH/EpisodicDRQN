@@ -8,12 +8,13 @@ from collections import namedtuple, deque
 from agent.abstract_agent import AbstractAgent
 from utils import *
 
-MADTHRESHOLD = 5
+MAD_THRESHOLD = 5
 TARGET_UPDATE = 10
+HIDDEN_SIZE = 128
 
 class NeuralNetwork(nn.Module):
 
-    def __init__(self, inputs, outputs, num_hidden=128):
+    def __init__(self, inputs, outputs, num_hidden=HIDDEN_SIZE):
         super(NeuralNetwork, self).__init__()
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(inputs, num_hidden),  # hidden layer
@@ -47,7 +48,7 @@ class DQNAgent(AbstractAgent):
         self.build()
         self.loss = []
 
-    def build(self, input_size):
+    def build(self):
         """State, Policy, Memory, Q are objects"""
         input_size = self.config.h if self.config.state_repr=='uni' else self.config.h*2 if self.config.state_repr=='bi' else 1
         self.PolicyNet = NeuralNetwork(input_size, self.n_actions) if self.name=='DQN' else None # an object

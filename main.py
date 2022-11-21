@@ -18,9 +18,9 @@ parser.add_argument('--temptation', default=5, type=float, help='')
 parser.add_argument('--sucker', default=0, type=float, help='')
 parser.add_argument('--punishment', default=1, type=float, help='')
 parser.add_argument('--alpha', default=0.1, type=float, help='The alpha (learning rate) for RL learning')
-parser.add_argument('--state_repr', default='unilabel', choices=[None, 'uni', 'bi', 'unilabel', 'grudgerlabel', 'bireward'], help='The state reprsentation method; (None: only use the opponent h actions; grudger: count mad)')
-parser.add_argument('--batch_size', default=64, help='The bathc size for Neural Network')
-parser.add_argument('--learning_rate', default=1e-3, help='The learning rate for optimizing Neural Network')
+parser.add_argument('--state_repr', default='unilabel', type=str, choices=[None, 'uni', 'bi', 'unilabel', 'grudgerlabel', 'bireward'], help='The state reprsentation method; (None: only use the opponent h actions; grudger: count mad)')
+parser.add_argument('--batch_size', default=64, type=int, help='The bathc size for Neural Network')
+parser.add_argument('--learning_rate', default=1e-3, type=float, help='The learning rate for optimizing Neural Network')
 # parser.print_help()
 # --------------------------------------------------------------------------- #
 
@@ -90,9 +90,9 @@ def main():
     print('press 2 to play against a strategy of your choice ')
     print('press 3 to play a N agents game')
     choice = int(input())
-    choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-dqn'}
-    rl_choices = {'7-qLearning','8-dqn'}
-    strategies = {0:'ALLC',1:'ALLD',2:'TitForTat',3:'revTitForTat',4:'Random',5:'Grudger',6:'Pavlov',7:'QLearning', 8:'DQN'}
+    choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn'}
+    rl_choices = {'7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn'}
+    strategies = {0:'ALLC',1:'ALLD',2:'TitForTat',3:'revTitForTat',4:'Random',5:'Grudger',6:'Pavlov',7:'QLearning',8:'LSTM',9:'DQN',10:'LSTMQN'}
 
     if choice == 0:
         # print('here are the strategies, choose one\n', choices)

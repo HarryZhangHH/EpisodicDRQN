@@ -11,6 +11,8 @@ from utils import *
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+TARGET_UPDATE = 10
+HIDDEN_SIZE = 128
 
 class LSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
@@ -49,7 +51,6 @@ class LSTMAgent(AbstractAgent):
         self.n_actions = config.n_actions
         self.own_memory = torch.zeros((config.n_episodes*1000, ))
         self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.play_epsilon = config.play_epsilon
         self.State = self.StateRepr(method=config.state_repr)
         self.build()
@@ -58,8 +59,8 @@ class LSTMAgent(AbstractAgent):
     def build(self):
         """State, Policy, Memory, Q are objects"""
         input_size = 2 if self.config.state_repr == 'bi' else 1
-        self.PolicyNet = LSTM(input_size, 128, 1, self.n_actions)
-        self.TargetNet = LSTM(input_size, self.n_actions)
+        self.PolicyNet = LSTM(input_size, HIDDEN_SIZE, 1, self.n_actions)
+        self.TargetNet = LSTM(input_size, HIDDEN_SIZE, 1, self.n_actions)
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.PolicyNet.eval())
         self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
@@ -89,7 +90,7 @@ class LSTMAgent(AbstractAgent):
 
     def select_action(self):
         # selection action based on epsilon greedy policy
-        self.State.state = torch.permute(self.State.state.view(-1, self.config.h), (1, 0)) if self.State.state is not None else None
+        self.State.state = torch.permute(self.State.state.view(-1, self.config.h), (1, 0)) if self.State.state is not None else None # important
         a = self.Policy.sample_action(self.State.state)
 
         # epsilon decay
@@ -107,14 +108,17 @@ class LSTMAgent(AbstractAgent):
         if self.State.state is not None:
             self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
                                                           torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
+            self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
             # push the transition into ReplayBuffer
-            # self.Memory.push(self.State.state, own_action, self.State.next_state, reward)
-            self.Memory.push(self.State.state, own_action, opponent_action, reward)
+            if self.name == 'LSTM':
+                self.Memory.push(self.State.state, own_action, opponent_action, reward)
+            elif self.name == 'LSTMQN':
+                self.Memory.push(self.State.state, own_action, self.State.next_state, reward)
             # print(f'Episode {self.play_times}:  {own_action}, {opponent_action}') if self.play_times > self.config.batch_size else None
             self.optimize_model()
-            # # Update the target network, copying all weights and biases in DQN
-            # if self.play_times % TARGET_UPDATE == 0:
-            #     self.Target_net.load_state_dict(self.PolicyNet.state_dict())
+            # Update the target network, copying all weights and biases in DQN
+            if self.play_times % TARGET_UPDATE == 0:
+                self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
 
 
     def optimize_model(self):
@@ -151,28 +155,31 @@ class LSTMAgent(AbstractAgent):
         # random transition batch is taken from experience replay memory
         transitions = self.Memory.sample(self.config.batch_size)
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
-        state, action, target, reward = zip(*transitions)
+        state, action, next_state, reward = zip(*transitions)
         # convert to PyTorch and define types
-        state = torch.stack(list(state), dim=0).to(self.device).view(self.config.batch_size, self.config.h, -1)
-        action = torch.tensor(action, dtype=torch.int64, device=self.device)[:, None]  # Need 64 bit to use them as index
-        target = torch.tensor(target, dtype=torch.int64, device=self.device)
-        # next_state = torch.stack(list(next_state), dim=0).to(self.device)
-        reward = torch.tensor(reward, dtype=torch.float, device=self.device)[:, None]
-        # compute the q value
-        # q_val = compute_q_vals(self.PolicyNet, state, action)
-        # with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
-        #     target = compute_targets(self.TargetNet, reward, next_state, self.config.discount)
+        state = torch.stack(list(state), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)
+        if self.name == 'LSTM':
+            target = torch.tensor(next_state, dtype=torch.int64, device=device)
+            outputs = self.PolicyNet(state)
+            criterion = nn.CrossEntropyLoss()
+
+        elif self.name == 'LSTMQN':
+            next_state = torch.stack(list(next_state), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)
+            action = torch.tensor(action, dtype=torch.int64, device=device)[:,None]  # Need 64 bit to use them as index
+            reward = torch.tensor(reward, dtype=torch.float, device=device)[:,None]
+            criterion = nn.SmoothL1Loss()
+            # compute the q value
+            outputs = compute_q_vals(self.PolicyNet, state, action)
+            with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
+                target = compute_targets(self.TargetNet, reward, next_state, self.config.discount)
 
         # loss is measured from error between current and newly expected Q values
-        # loss = F.smooth_l1_loss(q_val, target)
-        outputs = self.PolicyNet(state)
-        criterion = nn.CrossEntropyLoss()
         loss = criterion(outputs, target)
         # backpropagation of loss to Neural Network (PyTorch magic)
         self.Optimizer.zero_grad()
         loss.backward()
-        # for param in self.PolicyNet.parameters():
-        #     param.grad.data.clamp_(-1, 1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
+        for param in self.PolicyNet.parameters():
+            param.grad.data.clamp_(-1, 1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
         self.Optimizer.step()
         self.loss.append(loss.item())
         # test
