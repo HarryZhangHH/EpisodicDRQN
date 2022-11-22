@@ -1,40 +1,12 @@
-import numpy as np
-import random
-import torch
 import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from collections import namedtuple, deque
 from agent.abstract_agent import AbstractAgent
-from itertools import count
+from model import LSTM
 from utils import *
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 TARGET_UPDATE = 10
 HIDDEN_SIZE = 128
-
-class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, num_classes):
-        super(LSTM, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, num_classes)
-
-    def forward(self, x):
-        # Set initial hidden and cell states
-        # x need to be: (batch_size, seq_length, input_size)   seq_length=config.h
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
-
-        # Forward propagate LSTM
-        out, _ = self.lstm(x, (h0, c0))  # out: tensor of shape (batch_size, seq_length, hidden_size)
-
-        # Decode the hidden state of the last time step
-        # out: tensor of shape (batch_size, seq_length, hidden_size)
-        out = self.fc(out[:, -1, :])
-        return out
 
 class LSTMAgent(AbstractAgent):
     # h is every agents' most recent h actions are visiable to others which is composed to state
@@ -48,7 +20,6 @@ class LSTMAgent(AbstractAgent):
         """
         super(LSTMAgent, self).__init__(config)
         self.name = name
-        self.n_actions = config.n_actions
         self.own_memory = torch.zeros((config.n_episodes*1000, ))
         self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
         self.play_epsilon = config.play_epsilon
@@ -59,8 +30,8 @@ class LSTMAgent(AbstractAgent):
     def build(self):
         """State, Policy, Memory, Q are objects"""
         input_size = 2 if self.config.state_repr == 'bi' else 1
-        self.PolicyNet = LSTM(input_size, HIDDEN_SIZE, 1, self.n_actions)
-        self.TargetNet = LSTM(input_size, HIDDEN_SIZE, 1, self.n_actions)
+        self.PolicyNet = LSTM(input_size, HIDDEN_SIZE, 1, self.config.n_actions)
+        self.TargetNet = LSTM(input_size, HIDDEN_SIZE, 1, self.config.n_actions)
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.PolicyNet.eval())
         self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object

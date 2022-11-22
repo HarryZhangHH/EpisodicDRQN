@@ -1,31 +1,12 @@
-import numpy as np
-import random
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-from collections import namedtuple, deque
 from agent.abstract_agent import AbstractAgent
+from model import NeuralNetwork
 from utils import *
 
 MAD_THRESHOLD = 5
 TARGET_UPDATE = 10
 HIDDEN_SIZE = 128
-
-class NeuralNetwork(nn.Module):
-
-    def __init__(self, inputs, outputs, num_hidden=HIDDEN_SIZE):
-        super(NeuralNetwork, self).__init__()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(inputs, num_hidden),  # hidden layer
-            nn.BatchNorm1d(num_hidden),
-            nn.ReLU(),
-            nn.Linear(num_hidden, outputs)
-        )
-    
-    def forward(self, x):
-        logits = self.linear_relu_stack(x)
-        return logits
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class DQNAgent(AbstractAgent):
     # h is every agents' most recent h actions are visiable to others which is composed to state
@@ -39,10 +20,8 @@ class DQNAgent(AbstractAgent):
         """
         super(DQNAgent, self).__init__(config)
         self.name = name
-        self.n_actions = config.n_actions
         self.own_memory = torch.zeros((config.n_episodes*1000, ))
         self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.play_epsilon = config.play_epsilon
         self.State = self.StateRepr(method=config.state_repr)
         self.build()
@@ -51,8 +30,8 @@ class DQNAgent(AbstractAgent):
     def build(self):
         """State, Policy, Memory, Q are objects"""
         input_size = self.config.h if self.config.state_repr=='uni' else self.config.h*2 if self.config.state_repr=='bi' else 1
-        self.PolicyNet = NeuralNetwork(input_size, self.n_actions) if self.name=='DQN' else None # an object
-        self.TargetNet = NeuralNetwork(input_size, self.n_actions) if self.name=='DQN' else None # an object
+        self.PolicyNet = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE) if self.name=='DQN' else None # an object
+        self.TargetNet = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE) if self.name=='DQN' else None # an object
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.TargetNet.eval())
         self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
@@ -143,10 +122,10 @@ class DQNAgent(AbstractAgent):
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
         state, action, next_state, reward = zip(*transitions)
         # convert to PyTorch and define types
-        state = torch.stack(list(state), dim=0).to(self.device)
-        action = torch.tensor(action, dtype=torch.int64, device=self.device)[:, None]  # Need 64 bit to use them as index
-        next_state = torch.stack(list(next_state), dim=0).to(self.device)
-        reward = torch.tensor(reward, dtype=torch.float, device=self.device)[:, None]
+        state = torch.stack(list(state), dim=0).to(device)
+        action = torch.tensor(action, dtype=torch.int64, device=device)[:, None]  # Need 64 bit to use them as index
+        next_state = torch.stack(list(next_state), dim=0).to(device)
+        reward = torch.tensor(reward, dtype=torch.float, device=device)[:, None]
         # compute the q value
         q_val = compute_q_vals(self.PolicyNet, state, action)
         with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
