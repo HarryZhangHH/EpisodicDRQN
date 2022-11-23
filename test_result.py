@@ -14,6 +14,7 @@ from main import Config
 from utils import HiddenPrints
 from agent.lstm_agent import LSTMAgent
 from agent.actor_critic_agent import ActorCriticAgent
+from agent.actor_critic_lstm_agent import ActorCriticLSTMAgent
 from env import Environment
 
 # --------------------------------------------------------------------------- #
@@ -95,8 +96,9 @@ def test_lstm():
     config = configuration()
     env = Environment(config)
     agent2 = simulation.constructOpponent(strategies[2], config)
-    # agent1 = LSTMAgent('LSTMQN', config)
-    agent1 = ActorCriticAgent('A2C', config)
+    # agent2 = LSTMAgent('LSTMQN', config)
+    # agent1 = ActorCriticAgent('A2C', config)
+    agent1 = ActorCriticLSTMAgent('A2CLSTM', config)
     simulation.play(agent1, agent2, config.n_episodes, env)
     agent1.show()
     agent2.show()

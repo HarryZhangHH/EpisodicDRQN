@@ -2,7 +2,7 @@ import torch.nn.functional as F
 from env import Environment
 from agent.abstract_agent import AbstractAgent
 from agent.fix_strategy_agent import StrategyAgent
-from model import A2CNetwork
+from model import A2CLSTM
 from utils import *
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -12,7 +12,7 @@ ENTROPY_COEF = 0.01
 CRITIC_COEF = 0.5
 WORKER_NUM = 16
 
-class ActorCriticAgent(AbstractAgent):
+class ActorCriticLSTMAgent(AbstractAgent):
     # h is every agents' most recent h actions are visiable to others which is composed to state
     def __init__(self, name, config):
         """
@@ -20,9 +20,9 @@ class ActorCriticAgent(AbstractAgent):
         Parameters
         ----------
         config
-        name = A2C
+        name = A2CLSTM
         """
-        super(ActorCriticAgent, self).__init__(config)
+        super(ActorCriticLSTMAgent, self).__init__(config)
         self.name = name
         self.own_memory = torch.zeros((config.n_episodes*1000, ))
         self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
@@ -32,8 +32,8 @@ class ActorCriticAgent(AbstractAgent):
 
     def build(self):
         """State, Policy, Memory, Q are objects"""
-        input_size = self.config.h if self.config.state_repr == 'uni' else self.config.h * 2 if self.config.state_repr == 'bi' else 1
-        self.PolicyNet = A2CNetwork(input_size, self.config.n_actions, HIDDEN_SIZE)  # an object
+        self.input_size = 2 if self.config.state_repr == 'bi' else 1
+        self.PolicyNet = A2CLSTM(self.input_size, HIDDEN_SIZE, 1, self.config.n_actions)  # an object
 
         if 'Worker' not in self.name:
             print(self.PolicyNet.eval())
@@ -64,12 +64,13 @@ class ActorCriticAgent(AbstractAgent):
 
     def select_action(self):
         # selection action based on epsilon greedy policy
-        a = self.PolicyNet.act(self.State.state) if self.State.state is not None else random.randint(0, self.config.n_actions-1)
+        self.State.state = torch.permute(self.State.state.view(-1, self.config.h), (1, 0)) if self.State.state is not None else None # important
+        a = self.PolicyNet.act(self.State.state[None]) if self.State.state is not None else random.randint(0, self.config.n_actions-1)
         # self.PolicyNet.evaluate_action(self.State.state[None], torch.tensor(a)) if self.State.state is not None else None
         return a
 
     def update(self, reward, own_action, opponent_action):
-        super(ActorCriticAgent, self).update(reward)
+        super(ActorCriticLSTMAgent, self).update(reward)
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
         self.State.oppo_memory = self.opponent_memory[:self.play_times]
@@ -77,6 +78,7 @@ class ActorCriticAgent(AbstractAgent):
         if self.State.state is not None:
             self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
                                                           torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
+            self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
             if 'Worker' not in self.name:
                 # push the transition into ReplayBuffer
                 self.Memory.push(self.State.state, own_action, self.State.next_state, reward)
@@ -92,10 +94,11 @@ class ActorCriticAgent(AbstractAgent):
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
         state, action, next_state, reward = zip(*transitions)
         # convert to PyTorch and define types
-        state = torch.stack(list(state), dim=0).to(device)
+        state = torch.stack(list(state), dim=0).to(device).view(-1, self.config.h, self.input_size)
+        next_state = torch.stack(list(next_state), dim=0).to(device).view(-1, self.config.h, self.input_size)
         action = torch.tensor(action, dtype=torch.int64, device=device)  # Need 64 bit to use them as index
-        next_state = torch.stack(list(next_state), dim=0).to(device)
         reward = torch.tensor(reward, dtype=torch.float, device=device)[:, None]
+
         with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
             target = reward + self.config.discount * self.PolicyNet.get_critic(next_state)
         values, log_probs, entropy = self.PolicyNet.evaluate_action(state, action)
@@ -136,9 +139,11 @@ class Worker(object):
 
     def init_workers(self):
         self.opponents.append(StrategyAgent('TitForTat',self.config))
-        self.opponents.append(StrategyAgent('Pavlov',self.config))
+        # self.opponents.append(StrategyAgent('revTitForTat',self.config))
+        self.opponents.append(StrategyAgent('ALLC',self.config))
+        self.opponents.append(StrategyAgent('ALLD',self.config))
         for _ in range(len(self.opponents)):
-            self.workers.append(ActorCriticAgent('Worker', self.config))
+            self.workers.append(ActorCriticLSTMAgent('Worker', self.config))
 
     def set_batch(self, PolicyNet, Memory):
         for idx, worker in enumerate(self.workers):
