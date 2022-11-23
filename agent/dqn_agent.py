@@ -30,8 +30,8 @@ class DQNAgent(AbstractAgent):
     def build(self):
         """State, Policy, Memory, Q are objects"""
         input_size = self.config.h if self.config.state_repr=='uni' else self.config.h*2 if self.config.state_repr=='bi' else 1
-        self.PolicyNet = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE) if self.name=='DQN' else None # an object
-        self.TargetNet = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE) if self.name=='DQN' else None # an object
+        self.PolicyNet = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE).to(device) if self.name=='DQN' else None # an object
+        self.TargetNet = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE).to(device) if self.name=='DQN' else None # an object
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.TargetNet.eval())
         self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object

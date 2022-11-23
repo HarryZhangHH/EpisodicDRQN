@@ -26,7 +26,8 @@ class Environment():
         """
         episode = self.episode
         self.episode += 1
-
+        assert a1 is not None, "action of agent 1 is None"
+        assert a2 is not None, "action of agent 2 is None"
         if a1==0 and a2==0:
             r1, r2 = self.config.reward, self.config.reward
         elif a1==0 and a2==1:

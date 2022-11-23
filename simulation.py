@@ -2,10 +2,7 @@ import torch
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-from agent.fix_strategy_agent import StrategyAgent
-from agent.tabluar_agent import TabularAgent, SelectMemory
-from agent.dqn_agent import DQNAgent
-from agent.lstm_agent import LSTMAgent
+from agent import *
 from utils import label_encode, argmax, iterate_combination, question, seed_everything
 from env import Environment
 import sys
@@ -23,10 +20,15 @@ def constructOpponent(name, config):
         return TabularAgent(name, config)
     elif 'DQN' in name:
         return DQNAgent(name, config)
+    elif name == 'A2CLSTM':
+        return ActorCriticLSTMAgent(name, config)
     elif 'LSTM' in name:
         return LSTMAgent(name, config)
+    elif name == 'A2C':
+        return ActorCriticAgent(name, config)
     else:
         return StrategyAgent(name, config)
+
 
 def benchmark(strategies, num, config):
     # This benchmark is generated in the geometric setting using the first-visit Monte Carlo method
@@ -93,16 +95,16 @@ def twoSimulate(strategies, num, config, delta = 0.0001):
                 Q_table = agent1.Q_table.clone()
         else:
             play(agent1, agent2, config.n_episodes, env)
-        if 'DQN' in agent1.name or 'LSTM' in agent1.name:
+        if 'DQN' in agent1.name or 'LSTM' in agent1.name or 'A2C' in agent1.name:
             print(len(agent1.loss), np.mean(agent1.loss[::2]), np.mean(agent1.loss[::20]), np.mean(agent1.loss[::100]))
             plt.plot(agent1.loss[::20])
             plt.title(f'agent1: {agent1.name}')
-            plt.show()
-        if 'DQN' in agent2.name or 'LSTM' in agent2.name:
+            # plt.show()
+        if 'DQN' in agent2.name or 'LSTM' in agent2.name or 'A2C' in agent2.name:
             print(len(agent2.loss), np.mean(agent2.loss[::2]), np.mean(agent2.loss[::20]), np.mean(agent2.loss[::100]))
             plt.plot(agent2.loss[::20])
             plt.title(f'agent:{agent2.name}')
-            plt.show()
+            # plt.show()
         agent1.show()
         agent2.show()
         print(f'Your score: {agent1.running_score}\nOppo score: {agent2.running_score}')

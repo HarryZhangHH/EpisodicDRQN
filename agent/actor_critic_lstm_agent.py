@@ -33,7 +33,7 @@ class ActorCriticLSTMAgent(AbstractAgent):
     def build(self):
         """State, Policy, Memory, Q are objects"""
         self.input_size = 2 if self.config.state_repr == 'bi' else 1
-        self.PolicyNet = A2CLSTM(self.input_size, HIDDEN_SIZE, 1, self.config.n_actions)  # an object
+        self.PolicyNet = A2CLSTM(self.input_size, HIDDEN_SIZE, 1, self.config.n_actions).to(device)  # an object
 
         if 'Worker' not in self.name:
             print(self.PolicyNet.eval())

@@ -33,7 +33,7 @@ class ActorCriticAgent(AbstractAgent):
     def build(self):
         """State, Policy, Memory, Q are objects"""
         input_size = self.config.h if self.config.state_repr == 'uni' else self.config.h * 2 if self.config.state_repr == 'bi' else 1
-        self.PolicyNet = A2CNetwork(input_size, self.config.n_actions, HIDDEN_SIZE)  # an object
+        self.PolicyNet = A2CNetwork(input_size, self.config.n_actions, HIDDEN_SIZE).to(device)  # an object
 
         if 'Worker' not in self.name:
             print(self.PolicyNet.eval())

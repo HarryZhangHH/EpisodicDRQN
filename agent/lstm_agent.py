@@ -30,8 +30,8 @@ class LSTMAgent(AbstractAgent):
     def build(self):
         """State, Policy, Memory, Q are objects"""
         input_size = 2 if self.config.state_repr == 'bi' else 1
-        self.PolicyNet = LSTM(input_size, HIDDEN_SIZE, 1, self.config.n_actions)
-        self.TargetNet = LSTM(input_size, HIDDEN_SIZE, 1, self.config.n_actions)
+        self.PolicyNet = LSTM(input_size, HIDDEN_SIZE, 1, self.config.n_actions).to(device)
+        self.TargetNet = LSTM(input_size, HIDDEN_SIZE, 1, self.config.n_actions).to(device)
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.PolicyNet.eval())
         self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
