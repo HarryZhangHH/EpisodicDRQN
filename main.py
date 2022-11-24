@@ -7,7 +7,7 @@ import torch
 parser = argparse.ArgumentParser(description='Playground', prog='Prisoner dilemma simulation')
 parser.add_argument('--name', default=None, type=str, help='Name of the run, will be in the output file')
 parser.add_argument('--discount', default=0.95, type=float, help='Reward discount GAMMA, range:(0,1]')
-parser.add_argument('--n_episodes', default=10, type=int, help='Number of episodes within a batch')
+parser.add_argument('--n_episodes', default=1000, type=int, help='Number of episodes within a batch')
 parser.add_argument('--h', default=1, type=int, help='state amount')
 parser.add_argument('--play_epsilon', default=1, type=float, help='The greedy factor when each agent play the dilemma game')
 parser.add_argument('--select_epsilon', default=0.1, type=float, help='The greedy factor when each agent select the opponent')

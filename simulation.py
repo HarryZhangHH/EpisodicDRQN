@@ -17,14 +17,14 @@ def play(agent1, agent2, rounds, env):
 
 def constructOpponent(name, config):
     if name == 'A2CLSTM':
-        assert 'label' in (config.state_repr), 'you cannot use the label state representation method, lstm need the sequential data'
+        assert 'label' not in config.state_repr, 'you cannot use the label-based state representation method, lstm need the sequential data'
         return ActorCriticLSTMAgent(name, config)
     elif 'Learning' in name:
         return TabularAgent(name, config)
     elif 'DQN' in name:
         return DQNAgent(name, config)
     elif 'LSTM' in name:
-        assert 'label' in (config.state_repr), 'you cannot use the label state representation method, lstm need the sequential data'
+        assert 'label' not in config.state_repr, 'you cannot use the label-based state representation method, lstm need the sequential data'
         return LSTMAgent(name, config)
     elif 'A2C' in name:
         return ActorCriticAgent(name, config)
@@ -109,7 +109,8 @@ def twoSimulate(strategies, num, config, delta = 0.0001):
             # plt.show()
         agent1.show()
         agent2.show()
-        print(f'Your score: {agent1.running_score}\nOppo score: {agent2.running_score}')
+        print("==================================================")
+        print(f'{agent1.name} score: {agent1.running_score}\n{agent2.name} score: {agent2.running_score}')
         print("----------------------------------------------------------------------------------------------------------------------------------------------")
         print()
         # print(agent1.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')), agent1.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))

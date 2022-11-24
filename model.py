@@ -8,6 +8,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 class NeuralNetwork(nn.Module):
     def __init__(self, input_size, output_size, num_hidden):
         super(NeuralNetwork, self).__init__()
+        self.input_size = input_size
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(input_size, num_hidden),  # hidden layer
             nn.BatchNorm1d(num_hidden),
@@ -16,12 +17,15 @@ class NeuralNetwork(nn.Module):
         )
 
     def forward(self, x):
+        x = x.type(torch.FloatTensor)
+        x = x.view(-1, self.input_size)
         logits = self.linear_relu_stack(x)
         return logits
 
 class LSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
         super(LSTM, self).__init__()
+        self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
@@ -30,6 +34,9 @@ class LSTM(nn.Module):
     def forward(self, x):
         # Set initial hidden and cell states
         # x need to be: (batch_size, seq_length, input_size)   seq_length=config.h
+        x = x.type(torch.FloatTensor)
+        x = x.view(x.size(0), -1, self.input_size)
+
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
 
@@ -109,6 +116,7 @@ class A2CLSTM(nn.Module):
     def forward(self, x):
         # Set initial hidden and cell states
         # x need to be: (batch_size, seq_length, input_size)   seq_length=config.h
+        x = x.type(torch.FloatTensor)
         x = x.view(x.size(0), -1, self.input_size)
 
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
@@ -124,6 +132,7 @@ class A2CLSTM(nn.Module):
         return value, action_prob
 
     def get_critic(self, x):
+        x = x.type(torch.FloatTensor)
         x = x.view(x.size(0), -1, self.input_size)
         value, _ = self.forward(x)
         return value
