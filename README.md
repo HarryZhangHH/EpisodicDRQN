@@ -11,7 +11,7 @@ Removing the environment if something goes wrong
 ```
 conda remove --name partner_selection --all
 ```
-## Activating / Deactivating the environment
+Activating / Deactivating the environment
 ```
 conda activate partner_selection
 
