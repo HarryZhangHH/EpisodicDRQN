@@ -63,13 +63,15 @@ class A2CNetwork(nn.Module):
         )
 
     def forward(self, x):
+        x = x.type(torch.FloatTensor)
         x = x.view(-1, self.input_size)
         value = self.critic(x)
         action_prob = self.actor(x)
         return value, action_prob
 
     def get_critic(self, x):
-        x = x.view(x.size(0), -1)
+        x = x.type(torch.FloatTensor)
+        x = x.view(-1, self.input_size)
         return self.critic(x)
 
     def evaluate_action(self, state, action):

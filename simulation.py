@@ -16,15 +16,17 @@ def play(agent1, agent2, rounds, env):
     return r1, r2
 
 def constructOpponent(name, config):
-    if 'Learning' in name:
+    if name == 'A2CLSTM':
+        assert 'label' in (config.state_repr), 'you cannot use the label state representation method, lstm need the sequential data'
+        return ActorCriticLSTMAgent(name, config)
+    elif 'Learning' in name:
         return TabularAgent(name, config)
     elif 'DQN' in name:
         return DQNAgent(name, config)
-    elif name == 'A2CLSTM':
-        return ActorCriticLSTMAgent(name, config)
     elif 'LSTM' in name:
+        assert 'label' in (config.state_repr), 'you cannot use the label state representation method, lstm need the sequential data'
         return LSTMAgent(name, config)
-    elif name == 'A2C':
+    elif 'A2C' in name:
         return ActorCriticAgent(name, config)
     else:
         return StrategyAgent(name, config)
