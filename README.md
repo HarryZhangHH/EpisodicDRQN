@@ -1,9 +1,24 @@
-# PartnerSelection
+### PartnerSelection
 Implementation for the paper: Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning
 
-# Setting up an environment
+## Setting up an environment
+create an environment with the command:
+```
+conda env create -f path/to/environment.yml
+```
 
-# Sample Execution 
+Removing the environment if something goes wrong
+```
+conda remove --name partner_selection --all
+```
+## Activating / Deactivating the environment
+```
+conda activate partner_selection
+
+conda deactivate partner_selection
+```
+
+## Sample Execution 
 If run with default command line arguments, using
 
 ```
