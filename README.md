@@ -41,6 +41,6 @@ rl_choices = {'7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn','11-a2c','12-a2c
 
 `11-a2c` is a ActorCritic method using the deep NN. You may need to manually change the `Class Worker` in the `.\agent\actor_critic_agent.py` to your preference of worker number and worker against strategy.
 
-`12-a2clstm` is a ActorCritic method using the LSTM. You may need to manually change the `Class Worker` in the `.\agent\actor_critic_agent.py` to your preference of worker number and worker against strategy.
+`12-a2clstm` is a ActorCritic method using the LSTM. You may need to manually change the `Class Worker` in the `.\agent\actor_critic_lstm_agent.py` to your preference of worker number and worker against strategy.
 
 Note that, you need to manually change some hyperparameters (like `HIDDEN_SIZE`, `TARGET_UPDATE`) in the specific .py file.
