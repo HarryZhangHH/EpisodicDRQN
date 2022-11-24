@@ -37,7 +37,7 @@ Example command line arguments, using
 python main.py --h=10 --state_repr=bi --n_episode=10000 --batch_size=64
 ```
 ## When running
-After you successfully run the code, you will have 4 choices. 
+After you successfully run the code, you will have 4 choices. <br />
 Choice **0** is to run the 2-agents benchmark. <br />
 Choice **1** is to test a method with all the other other method in 2-agents setting. <br />
 Choice **2** is to test a reinforcement learning method with another specific method in 2-agents setting. <br />
@@ -63,3 +63,5 @@ The first 7 methods are the fix-strategy methods.
 12-a2clstm is a ActorCritic method using the LSTM. You may need to manually change the `Class Worker` in the `.\agent\actor_critic_lstm_agent.py` to your preference of worker number and worker against strategy.
 
 Note that, you can manually change some hyperparameters (like `HIDDEN_SIZE`, `TARGET_UPDATE`) in the specific .py file.
+
+[^1]: (Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning)[]
