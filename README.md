@@ -52,11 +52,11 @@ The first 7 methods are the fix-strategy methods.
 
 7-qLearning is the tabular q learning method, you can change the `--h=` and `--state_repr=` in command line arguments to determine the tabular size. Note that using tabular method, the maximize of h is 3 and you can only use the label based state representation.
 
-8-lstm-pavlov is a LSTM method using the LSTM network to predict the next action of your opponent, you can change the `--h=` to determine the sequence length. Note that you can not use the label based state representation in the lstm based method. I personally recommend `--state_repr=bi`.
+8-lstm-pavlov is a LSTM[^3] method using the LSTM network to predict the next action of your opponent, you can change the `--h=` to determine the sequence length. Note that you can not use the label based state representation in the lstm based method. I personally recommend `--state_repr=bi`.
 
-9-dqn is a DQN method to predict the Q value.
+9-dqn is a DQN[^2] method to predict the Q value.
 
-10-lstmqn is a DQN method using the LSTM network to predict the Q value. Note that you can not use the label based state representation in the lstm based method. I personally recommend `--state_repr=bi`.
+10-lstmqn is a DQN[^2] method using the LSTM[^3] network to predict the Q value. Note that you can not use the label based state representation in the lstm based method. I personally recommend `--state_repr=bi`.
 
 11-a2c is a ActorCritic method using the deep NN. You may need to manually change the `Class Worker` in the `.\agent\actor_critic_agent.py` to your preference of worker number and worker against strategy.
 
@@ -65,3 +65,5 @@ The first 7 methods are the fix-strategy methods.
 Note that, you can manually change some hyperparameters (like `HIDDEN_SIZE`, `TARGET_UPDATE`) in the specific .py file.
 
 [^1]: [Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning](https://arxiv.org/abs/1902.03185)
+[^2]: [DQN](https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html)
+[^3]: [LSTM](https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html) 
