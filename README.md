@@ -1,6 +1,8 @@
 # PartnerSelection
 Implementation for the paper: Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning
 
+# Setting up an environment
+
 # Sample Execution 
 If run with default command line arguments, using
 
