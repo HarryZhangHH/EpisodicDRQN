@@ -64,4 +64,4 @@ The first 7 methods are the fix-strategy methods.
 
 Note that, you can manually change some hyperparameters (like `HIDDEN_SIZE`, `TARGET_UPDATE`) in the specific .py file.
 
-[^1]: (Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning)[]
+[^1]: [Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning]()
