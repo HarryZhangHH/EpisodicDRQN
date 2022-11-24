@@ -58,9 +58,9 @@ The first 7 methods are the fix-strategy methods.
 
 10-lstmqn is a DQN[^2] method using the LSTM[^3] network to predict the Q value. Note that you can not use the label based state representation in the lstm based method. I personally recommend `--state_repr=bi`.
 
-11-a2c is a ActorCritic method using the deep NN. You may need to manually change the `Class Worker` in the `.\agent\actor_critic_agent.py` to your preference of worker number and worker against strategy.
+11-a2c is a ActorCritic method using the deep NN. You may need to manually change the `Class Worker` in the `./agent/actor_critic_agent.py` to your preference of worker number and worker against strategy.
 
-12-a2clstm is a ActorCritic method using the LSTM. You may need to manually change the `Class Worker` in the `.\agent\actor_critic_lstm_agent.py` to your preference of worker number and worker against strategy.
+12-a2clstm is a ActorCritic method using the LSTM. You may need to manually change the `Class Worker` in the `./agent/actor_critic_lstm_agent.py` to your preference of worker number and worker against strategy.
 
 Note that, you can manually change some hyperparameters (like `HIDDEN_SIZE`, `TARGET_UPDATE`) in the specific .py file.
 
