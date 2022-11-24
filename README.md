@@ -38,10 +38,10 @@ python main.py --h=10 --state_repr=bi --n_episode=10000 --batch_size=64
 ```
 ## When running
 After you successfully run the code, you will have 4 choices. 
-Choice **0** is to run the 2-agents benchmark. \\
-Choice **1** is to test a method with all the other other method in 2-agents setting
-Choice **2** is to test a reinforcement learning method with another specific method in 2-agents setting
-Choice **3** is to run the multi-agents benchmark.
+Choice **0** is to run the 2-agents benchmark. <br />
+Choice **1** is to test a method with all the other other method in 2-agents setting. <br />
+Choice **2** is to test a reinforcement learning method with another specific method in 2-agents setting. <br />
+Choice **3** is to run the multi-agents benchmark. 
 
 The selectable methods: 
 ```
