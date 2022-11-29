@@ -98,12 +98,12 @@ def twoSimulate(strategies, num, config, delta = 0.0001):
         else:
             play(agent1, agent2, config.n_episodes, env)
         if 'DQN' in agent1.name or 'LSTM' in agent1.name or 'A2C' in agent1.name:
-            print(len(agent1.loss), np.mean(agent1.loss[::2]), np.mean(agent1.loss[::20]), np.mean(agent1.loss[::100]))
+            print(f'length of loss: {len(agent1.loss)}, average of loss (interval is 2): {np.mean(agent1.loss[::2])}, average of loss (interval is 20): {np.mean(agent1.loss[::20])}, average of loss (interval is 100): {np.mean(agent1.loss[::100])}')
             plt.plot(agent1.loss[::20])
             plt.title(f'agent1: {agent1.name}')
             # plt.show()
         if 'DQN' in agent2.name or 'LSTM' in agent2.name or 'A2C' in agent2.name:
-            print(len(agent2.loss), np.mean(agent2.loss[::2]), np.mean(agent2.loss[::20]), np.mean(agent2.loss[::100]))
+            print(f'length of loss: {len(agent2.loss)}, average of loss (interval is 2): {np.mean(agent2.loss[::2])}, average of loss (interval is 20): {np.mean(agent2.loss[::20])}, average of loss (interval is 100): {np.mean(agent2.loss[::100])}')
             plt.plot(agent2.loss[::20])
             plt.title(f'agent:{agent2.name}')
             # plt.show()
