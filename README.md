@@ -58,12 +58,13 @@ The first 7 methods are the fix-strategy methods.
 
 10-lstmqn is a DQN[^2] method using the LSTM[^3] network to predict the Q value. Note that you can not use the label based state representation in the lstm based method. I personally recommend `--state_repr=bi`.
 
-11-a2c is a ActorCritic method using the deep NN. You may need to manually change the `Class Worker` in the `./agent/actor_critic_agent.py` to your preference of worker number and worker against strategy.
+11-a2c is a ActorCritic[^4] method using the deep NN. You may need to manually change the `Class Worker` in the `./agent/actor_critic_agent.py` to your preference of worker number and worker against strategy.
 
-12-a2clstm is a ActorCritic method using the LSTM. You may need to manually change the `Class Worker` in the `./agent/actor_critic_lstm_agent.py` to your preference of worker number and worker against strategy.
+12-a2clstm is a ActorCritic[^4] method using the LSTM. You may need to manually change the `Class Worker` in the `./agent/actor_critic_lstm_agent.py` to your preference of worker number and worker against strategy.
 
 Note that, you can manually change some hyperparameters (like `HIDDEN_SIZE`, `TARGET_UPDATE`) in the specific .py file.
 
 [^1]: [Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning](https://arxiv.org/abs/1902.03185)
 [^2]: [DQN](https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html)
 [^3]: [LSTM](https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html) 
+[^4]: [Actor Critic](https://omegastick.github.io/2018/06/25/easy-a2c.html)
