@@ -115,7 +115,7 @@ class AbstractAgent():
                 state_emb = oppo_action.float()
             if 'bi' in self.method:
                 assert own_action is not None, 'Make sure you input valid own_action in bi representation'
-                state_emb = torch.cat((oppo_action.float(), own_action.float()))
+                state_emb = torch.cat((oppo_action.float(), own_action.float())) if oppo_action.size() == own_action.size() else None
             if 'reward' in self.method:
                 assert reward is not None, 'Make sure you input valid reward in representation'
                 state_emb = torch.cat((state_emb, torch.FloatTensor([reward])))

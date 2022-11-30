@@ -79,6 +79,7 @@ class LSTMAgent(AbstractAgent):
         if self.State.state is not None:
             self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
                                                           torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
+            # print(self.State.next_state)
             self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
             # push the transition into ReplayBuffer
             if self.name == 'LSTM':

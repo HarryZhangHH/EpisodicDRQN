@@ -10,7 +10,7 @@ parser.add_argument('--discount', default=0.95, type=float, help='Reward discoun
 parser.add_argument('--n_episodes', default=1000, type=int, help='Number of episodes within a batch')
 parser.add_argument('--h', default=1, type=int, help='state amount')
 parser.add_argument('--play_epsilon', default=1, type=float, help='The greedy factor when each agent play the dilemma game')
-parser.add_argument('--select_epsilon', default=0.1, type=float, help='The greedy factor when each agent select the opponent')
+parser.add_argument('--select_epsilon', default=1, type=float, help='The greedy factor when each agent select the opponent')
 parser.add_argument('--epsilon_decay', default=0.99, type=float, help='The decay coefficient of epsilon greedy policy of play_epsilon: (new_play_epsilon) = (old_play_epsilon)*epsilon_decay, play_epsilon >= min_epsilon')
 parser.add_argument('--min_epsilon', default=0.01, type=float, help='The minimum epsilon value of play_epsilon')
 parser.add_argument('--reward', default=3, type=float, help='The payoff when both agents cooperate')
@@ -48,17 +48,18 @@ class Config():
         self.learning_rate = learning_rate
 
     def __repr__(self):
-        return 'Configs: ' + ' episodes=' + str(self.n_episodes) + \
+        return 'Configs:\n' + ' episodes=' + str(self.n_episodes) + \
             ' discount=' + str(self.discount) + \
             '\npayoff matrix: ' + \
             ' r=' + str(self.reward) + \
             ' t=' + str(self.temptation) + \
             ' s=' + str(self.sucker) + \
             ' p=' + str(self.punishment) + \
-            ' play_epsilon=' + str(self.play_epsilon) + \
+            '\nplay_epsilon=' + str(self.play_epsilon) + \
             ' select_epsilon=' + str(self.select_epsilon) + \
             ' epsilon_decay=' + str(self.epsilon_decay) + \
-            ' state_repr=' + str(self.state_repr)
+            ' state_repr=' + str(self.state_repr) + \
+            ' h=' + str(self.h)
 
 
 def main():
@@ -118,9 +119,7 @@ def main():
         simulation.twoSimulate(dict({num: strategies[num], rl_num: strategies[rl_num]}), rl_num, config)
 
     if choice == 3:
-        print('how many agents to play')
-        n_agents = int(input())
-        simulation.multiBenchmark(n_agents, strategies, config)
+        simulation.multiAgentSimulate(strategies, config)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         

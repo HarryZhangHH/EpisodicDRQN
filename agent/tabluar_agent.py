@@ -4,24 +4,8 @@ from agent.abstract_agent import AbstractAgent
 from agent.fix_strategy_agent import StrategyAgent
 from utils import argmax, label_encode
 from env import Environment
-from collections import namedtuple, deque
 
 MADTHRESHOLD = 5
-Agent = namedtuple('Agent', ['state', 'action', 'agent_1', 'agent_2', 'action_1', 'action_2', 'reward_1', 'reward_2'])
-
-class SelectMemory(object):
-    """
-    Used for multi-agent games
-    """
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.memory = deque([],maxlen=capacity)
-    def push(self, *args):
-        self.memory.append(Agent(*args))
-    def clean(self):
-        self.memory = deque([],maxlen=self.capacity)
-    def __len__(self):
-        return len(self.memory)
 
 class TabularAgent(AbstractAgent):
     """

@@ -17,6 +17,14 @@ class Environment():
         self.config = config
         self.episode = 0
         self.running_score = 0.0
+
+    def play(self, agent1, agent2, episodes):
+        for i in range(episodes):
+            a1, a2 = agent1.act(agent2), agent2.act(agent1)
+            _, r1, r2 = self.step(a1, a2)
+            agent1.update(r1, a1, a2)
+            agent2.update(r2, a2, a1)
+        return r1, r2
     
     def step(self, a1, a2):
         """

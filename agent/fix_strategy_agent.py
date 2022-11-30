@@ -42,7 +42,7 @@ class StrategyAgent(AbstractAgent):
             else:
                 return reverse(int(oppo_agent.own_memory[oppo_agent.play_times-1]))
         elif self.name == 'Pavlov':
-            if oppo_agent.play_times == 0:
+            if oppo_agent.play_times == 0 or self.play_times == 0:
                 return 0
             if oppo_agent.own_memory[oppo_agent.play_times-1] == self.own_memory[self.play_times-1]:
                 return 0
