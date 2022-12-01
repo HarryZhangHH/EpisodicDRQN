@@ -101,7 +101,7 @@ class AbstractAgent():
             self.mad = False
             self.oppo_memory = torch.zeros((1,))
 
-        def state_repr(self, oppo_action, own_action=None, reward=None):
+        def state_repr(self, oppo_action, own_action=None, feature=None):
             """
             This method takes the opponent action and your own action as input and return an encoded state
 
@@ -119,9 +119,9 @@ class AbstractAgent():
             if 'bi' in self.method:
                 assert own_action is not None, 'Make sure you input valid own_action in bi representation'
                 state_emb = torch.cat((oppo_action.float(), own_action.float())) if oppo_action.size() == own_action.size() else None
-            if 'reward' in self.method:
-                assert reward is not None, 'Make sure you input valid reward in representation'
-                state_emb = torch.cat((state_emb, torch.FloatTensor([reward])))
+            if 'repr' in self.method:
+                assert feature is not None, 'Make sure you input valid feateures in representation'
+                state_emb = (state_emb, feature)
             if 'label' in self.method:
                 state_emb = label_encode(oppo_action)
             if self.method == 'grudgerlabel':

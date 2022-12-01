@@ -121,7 +121,7 @@ def twoSimulate(strategies, num, config, delta = 0.0001):
 ########################################################################################################################
 
 # multi-agent PD benchmark
-MULTI_SELECTION_METHOD = 'DQN'
+MULTI_SELECTION_METHOD = 'LSTM'
 def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METHOD):
     """
     Multi-agent simulation
@@ -177,7 +177,10 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
         agents = random_selection(config, agents, env)
 
     if selection_method == 'DQN':
-        agents = dqn_selection(config, agents, env)
+        agents = dqn_selection(config, agents, env, False)
+    
+    if selection_method == 'LSTM':
+        agents = dqn_selection(config, agents, env, True)
 
     for n in range(len(agents)):
         print('Agent{}: name:{}  final score:{}  play time:{}  times to play D:{}  ratio: {}'

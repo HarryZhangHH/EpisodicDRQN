@@ -25,6 +25,9 @@ class DQNAgent(AbstractAgent):
         self.play_epsilon = config.play_epsilon
         self.State = self.StateRepr(method=config.state_repr)
         self.build()
+        self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
+        self.Memory = self.ReplayBuffer(100)  # an object
+        self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
         self.loss = []
 
     def build(self):
@@ -34,9 +37,7 @@ class DQNAgent(AbstractAgent):
         self.TargetNet = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE).to(device) if self.name=='DQN' else None # an object
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.TargetNet.eval())
-        self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
-        self.Memory = self.ReplayBuffer(100)  # an object
-        self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
+        
 
     def act(self, oppo_agent):
         """

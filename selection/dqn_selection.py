@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from collections import namedtuple, deque
 
-from model import NeuralNetwork
+from model import NeuralNetwork, LSTM
 from selection.memory import Memory
 from utils import *
 
@@ -35,25 +35,28 @@ class SelectMemory(Memory):
     def push(self, *args):
         self.memory.append(ReplayBuffer(*args))
 
-def dqn_selection(config, agents, env):
+def feature_extraction(state, ):
+    pass 
+
+def dqn_selection(config, agents, env, rnn):
     """
     DQN selection method (benchmark2)
     Parameters
     ----------
-    config
-    agents
-    env
+    config: object
+    agents: dict of n objcts
+    env: object
 
     Returns
     -------
-
+    agents
     """
     # construct selection network
     n_agents = len(agents)
     for n in agents:
         agent = agents[n]
-        agent.SelectionPolicyNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN).to(device)
-        agent.SelectionTargetNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN).to(device)
+        agent.SelectionPolicyNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN).to(device) if not rnn else LSTM(n_agents, NUM_HIDDEN, 1, n_agents-1).to(device)
+        agent.SelectionTargetNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN).to(device) if not rnn else LSTM(n_agents, NUM_HIDDEN, 1, n_agents-1).to(device)
         agent.SelectionTargetNN.load_state_dict(agent.SelectionPolicyNN.state_dict())
         agent.SelectMemory = SelectMemory(1000)
         agent.SelectOptimizer = torch.optim.Adam(agent.SelectionPolicyNN.parameters(), lr=config.learning_rate)
@@ -81,7 +84,8 @@ def dqn_selection(config, agents, env):
                 r1, r2 = env.play(agents[n], agents[m], 1)
                 society_reward = society_reward + r1 + r2
         else:
-            state = torch.stack(state, dim=0).view(n_agents*config.h).to(device)
+            state = torch.stack(state, dim=0)
+            state = state.view(n_agents*config.h).to(device) if not rnn else state.T.to(device)
             # select opponent based on SelectionNN
             for n in agents:
                 # select action by epsilon greedy
@@ -113,7 +117,8 @@ def dqn_selection(config, agents, env):
                 t = agent.play_times
                 if t >= config.h:
                     next_state.append(torch.as_tensor(agent.own_memory[t - config.h: t], dtype=torch.float))
-            next_state = torch.stack(next_state, dim=0).view(n_agents*config.h).to(device)
+            next_state = torch.stack(next_state, dim=0)
+            next_state = next_state.view(n_agents*config.h).to(device) if not rnn else next_state.T.to(device)
 
             losses = []
             for me in update_memory.memory:
@@ -121,7 +126,8 @@ def dqn_selection(config, agents, env):
                 reward = me[4]
                 action = me[1]-1 if me[1]>me[0] else me[1]
                 agent1.SelectMemory.push(state, action, reward, next_state)
-                loss = optimize_model(agent1, n_agents)
+                agent1.SelectionPolicyNN.train()
+                loss = optimize_model(agent1, n_agents, rnn)
                 losses.append(loss) if loss is not None else None
                 # Update the target network, copying all weights and biases in DQN
                 if agent1.play_times % TARGET_UPDATE == 0:
@@ -134,7 +140,7 @@ def dqn_selection(config, agents, env):
         env.update(society_reward)
     return agents
 
-def optimize_model(agent, n_agents):
+def optimize_model(agent, n_agents, rnn):
     """ Train our model """
     def compute_q_vals(Q, states, actions):
         """
@@ -171,9 +177,10 @@ def optimize_model(agent, n_agents):
     # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
     state, action, reward, next_state = zip(*transitions)
     # convert to PyTorch and define types
-    state = torch.stack(list(state), dim=0).to(device).view(agent.config.batch_size, -1)
-
-    next_state = torch.stack(list(next_state), dim=0).to(device).view(agent.config.batch_size, -1)
+    state = torch.stack(list(state), dim=0).to(device)
+    next_state = torch.stack(list(next_state), dim=0).to(device)
+    state = state.view(agent.config.batch_size, -1) if not rnn else state.view(agent.config.batch_size, agent.config.h, n_agents)
+    next_state = next_state.view(agent.config.batch_size, -1) if not rnn else next_state.view(agent.config.batch_size, agent.config.h, n_agents)
     action = torch.tensor(action, dtype=torch.int64, device=device)[:, None]  # Need 64 bit to use them as index
     reward = torch.tensor(reward, dtype=torch.float, device=device)[:, None]
     criterion = nn.SmoothL1Loss()

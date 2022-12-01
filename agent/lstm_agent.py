@@ -24,6 +24,9 @@ class LSTMAgent(AbstractAgent):
         self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
         self.play_epsilon = config.play_epsilon
         self.State = self.StateRepr(method=config.state_repr)
+        self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
+        self.Memory = self.ReplayBuffer(1000)  # an object
+        self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
         self.build()
         self.loss = []
 
@@ -34,10 +37,7 @@ class LSTMAgent(AbstractAgent):
         self.TargetNet = LSTM(input_size, HIDDEN_SIZE, 1, self.config.n_actions).to(device)
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.PolicyNet.eval())
-        self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
-        self.Memory = self.ReplayBuffer(1000)  # an object
-        self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
-
+        
     def act(self, oppo_agent):
         """
         Agent act based on the oppo_agent's information
@@ -147,7 +147,6 @@ class LSTMAgent(AbstractAgent):
 
         # loss is measured from error between current and newly expected Q values
         loss = criterion(outputs, target)
-        self.PolicyNet.train()
         # backpropagation of loss to Neural Network (PyTorch magic)
         self.Optimizer.zero_grad()
         loss.backward()
