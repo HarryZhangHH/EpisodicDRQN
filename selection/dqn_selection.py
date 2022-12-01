@@ -52,8 +52,8 @@ def dqn_selection(config, agents, env):
     n_agents = len(agents)
     for n in agents:
         agent = agents[n]
-        agent.SelectionPolicyNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN)
-        agent.SelectionTargetNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN)
+        agent.SelectionPolicyNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN).to(device)
+        agent.SelectionTargetNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN).to(device)
         agent.SelectionTargetNN.load_state_dict(agent.SelectionPolicyNN.state_dict())
         agent.SelectMemory = SelectMemory(1000)
         agent.SelectOptimizer = torch.optim.Adam(agent.SelectionPolicyNN.parameters(), lr=config.learning_rate)
@@ -81,7 +81,7 @@ def dqn_selection(config, agents, env):
                 r1, r2 = env.play(agents[n], agents[m], 1)
                 society_reward = society_reward + r1 + r2
         else:
-            state = torch.stack(state, dim=0).resize(n_agents*config.h).to(device)
+            state = torch.stack(state, dim=0).view(n_agents*config.h).to(device)
             # select opponent based on SelectionNN
             for n in agents:
                 # select action by epsilon greedy
@@ -113,7 +113,7 @@ def dqn_selection(config, agents, env):
                 t = agent.play_times
                 if t >= config.h:
                     next_state.append(torch.as_tensor(agent.own_memory[t - config.h: t], dtype=torch.float))
-            next_state = torch.stack(next_state, dim=0).resize(n_agents*config.h).to(device)
+            next_state = torch.stack(next_state, dim=0).view(n_agents*config.h).to(device)
 
             losses = []
             for me in update_memory.memory:
@@ -130,7 +130,7 @@ def dqn_selection(config, agents, env):
                 # epsilon decay
                 if agent1.config.select_epsilon > agent1.config.min_epsilon:
                     agent1.config.select_epsilon *= agent1.config.epsilon_decay
-            print(losses) if len(losses) != 0 else None
+            # print(losses) if len(losses) != 0 else None
         env.update(society_reward)
     return agents
 

@@ -36,7 +36,6 @@ class ActorCriticLSTMAgent(AbstractAgent):
         self.PolicyNet = A2CLSTM(self.input_size, HIDDEN_SIZE, 1, self.config.n_actions).to(device)  # an object
 
         if 'Worker' not in self.name:
-            print(self.PolicyNet.eval())
             self.Memory = self.ReplayBuffer(100)  # an object
             self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
             self.Workers = Worker(self.config)

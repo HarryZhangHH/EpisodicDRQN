@@ -147,6 +147,7 @@ class LSTMAgent(AbstractAgent):
 
         # loss is measured from error between current and newly expected Q values
         loss = criterion(outputs, target)
+        self.PolicyNet.train()
         # backpropagation of loss to Neural Network (PyTorch magic)
         self.Optimizer.zero_grad()
         loss.backward()

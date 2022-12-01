@@ -3,6 +3,9 @@ import torch
 import numpy as np
 import os, sys
 import random
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 class HiddenPrints:
     """
     To prevent a function from printing
@@ -47,6 +50,7 @@ def label_encode(state):
 def argmax(x):
     denominator = 1000000
     if torch.is_tensor(x):
+        x = x.to('cpu')
         with torch.no_grad():
             return torch.argmax(x + torch.rand(x.shape[-1])/denominator).item()
     elif type(x) is np.ndarray:

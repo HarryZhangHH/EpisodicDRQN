@@ -17,7 +17,7 @@ class NeuralNetwork(nn.Module):
         )
 
     def forward(self, x):
-        x = x.type(torch.FloatTensor)
+        x = x.type(torch.FloatTensor).to(device)
         x = x.view(-1, self.input_size)
         logits = self.linear_relu_stack(x)
         return logits
@@ -34,7 +34,7 @@ class LSTM(nn.Module):
     def forward(self, x):
         # Set initial hidden and cell states
         # x need to be: (batch_size, seq_length, input_size)   seq_length=config.h
-        x = x.type(torch.FloatTensor)
+        x = x.type(torch.FloatTensor).to(device)
         x = x.view(x.size(0), -1, self.input_size)
 
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
@@ -70,14 +70,14 @@ class A2CNetwork(nn.Module):
         )
 
     def forward(self, x):
-        x = x.type(torch.FloatTensor)
+        x = x.type(torch.FloatTensor).to(device)
         x = x.view(-1, self.input_size)
         value = self.critic(x)
         action_prob = self.actor(x)
         return value, action_prob
 
     def get_critic(self, x):
-        x = x.type(torch.FloatTensor)
+        x = x.type(torch.FloatTensor).to(device)
         x = x.view(-1, self.input_size)
         return self.critic(x)
 
@@ -116,7 +116,7 @@ class A2CLSTM(nn.Module):
     def forward(self, x):
         # Set initial hidden and cell states
         # x need to be: (batch_size, seq_length, input_size)   seq_length=config.h
-        x = x.type(torch.FloatTensor)
+        x = x.type(torch.FloatTensor).to(device)
         x = x.view(x.size(0), -1, self.input_size)
 
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
@@ -132,7 +132,7 @@ class A2CLSTM(nn.Module):
         return value, action_prob
 
     def get_critic(self, x):
-        x = x.type(torch.FloatTensor)
+        x = x.type(torch.FloatTensor).to(device)
         x = x.view(x.size(0), -1, self.input_size)
         value, _ = self.forward(x)
         return value

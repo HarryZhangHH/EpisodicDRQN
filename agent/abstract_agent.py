@@ -4,6 +4,8 @@ from utils import argmax, label_encode
 from collections import namedtuple, deque
 import numpy as np
 Transition = namedtuple('Transition', ['state','action','next_state','reward'])
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 class AbstractAgent():
     """ 
     Abstract an agent (superclass)
@@ -75,6 +77,7 @@ class AbstractAgent():
                 else:
                     self.Q.eval()
                     a = argmax(self.Q(obs[None]))
+                    self.Q.train()
             else:
                 a = random.randint(0, self.n_actions-1)
             return a
