@@ -18,7 +18,7 @@ parser.add_argument('--temptation', default=5, type=float, help='The payoff when
 parser.add_argument('--sucker', default=0, type=float, help='The payoff when both agents defect')
 parser.add_argument('--punishment', default=1, type=float, help='The payoff when you cooperate and your opponent defects')
 parser.add_argument('--alpha', default=0.1, type=float, help='The alpha (learning rate) for tabular q learning method')
-parser.add_argument('--state_repr', default='bi', type=str, choices=[None, 'uni', 'bi', 'unilabel', 'grudgerlabel', 'bireward'], help='The state reprsentation method; (None: only use the opponent h actions; grudger: count mad)')
+parser.add_argument('--state_repr', default='bi', type=str, choices=[None, 'uni', 'bi', 'unilabel', 'grudgerlabel', 'bi-repr'], help='The state reprsentation method; (None: only use the opponent h actions; grudger: count mad)')
 parser.add_argument('--batch_size', default=64, type=int, help='The batch size for updating Neural Network-based RL method like dqn, lstm, a2c...')
 parser.add_argument('--learning_rate', default=1e-3, type=float, help='The learning rate for optimizing Neural Network-based RL method like dqn, lstm, a2c...')
 # parser.print_help()

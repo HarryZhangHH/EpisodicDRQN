@@ -59,6 +59,17 @@ def argmax(x):
         x = np.asarray(x)
         return np.argmax(x + np.random.rand(x.shape[-1])/denominator)
 
+def calculate_sum(x):
+    if isinstance(x, int):
+        return x
+    elif torch.is_tensor(x):
+        with torch.no_grad():
+            return torch.sum(x).item()
+    elif type(x) is np.ndarray:
+        return np.sum(x)
+    else:
+        return sum(x)
+
 def iterate_combination(n):
     idx = [i for i in range(n)]
     iter = []

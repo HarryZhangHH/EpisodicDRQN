@@ -50,7 +50,7 @@ class LSTM(nn.Module):
 
 class LSTMVariant(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, feature_size, output_size):
-        super(LSTM, self).__init__()
+        super(LSTMVariant, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -71,11 +71,11 @@ class LSTMVariant(nn.Module):
         c0 = torch.zeros(self.num_layers, x1.size(0), self.hidden_size).to(device)
 
         out_lstm, _ = self.lstm(x1, (h0, c0))  # out_lstm: tensor of shape (batch_size, seq_length, hidden_size)
-        out_fc1 = self.fc1(x2)    
-        x = torch.cat(out_lstm[:, -1, :].view(x1.size(0), self.hidden_size), out_fc1.view(x1.size(0), self.hidden_size)).to(device)
+        out_fc1 = self.fc1(x2)
+        x = torch.cat((out_lstm[:, -1, :].view(x1.size(0), self.hidden_size), out_fc1.view(x1.size(0), self.hidden_size)), dim=1)
 
         x = F.relu(self.fc1_bn(x))
-        out = self.fc(x)
+        out = self.fc2(x)
         return out
 
 class A2CNetwork(nn.Module):

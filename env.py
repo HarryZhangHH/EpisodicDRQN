@@ -24,6 +24,8 @@ class Environment():
             _, r1, r2 = self.step(a1, a2)
             agent1.update(r1, a1, a2)
             agent2.update(r2, a2, a1)
+            agent1.optimize(a1, r1, agent2)
+            agent2.optimize(a2, r2, agent1)
         return r1, r2
     
     def step(self, a1, a2):
@@ -34,8 +36,8 @@ class Environment():
         """
         episode = self.episode
         self.episode += 1
-        assert a1 is not None, "action of agent 1 is None"
-        assert a2 is not None, "action of agent 2 is None"
+        assert a1 in [0,1], f"action of agent 1 value is {a1} which not correct"
+        assert a2 in [0,1], f"action of agent 2 value is {a2} which not correct"
         if a1==0 and a2==0:
             r1, r2 = self.config.reward, self.config.reward
         elif a1==0 and a2==1:

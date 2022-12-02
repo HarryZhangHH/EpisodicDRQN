@@ -25,8 +25,11 @@ class AbstractAgent():
     def update(self, reward):
         self.running_score = reward + self.config.discount * self.running_score
         self.play_times += 1
-
     __update = update
+
+    def optimize(self, action, reward, oppo_agent):
+        pass
+    __optimize = optimize
 
     def reset(self):
         self.running_score = 0.0
@@ -76,7 +79,11 @@ class AbstractAgent():
                     a = argmax(self.Q[obs])
                 else:
                     self.Q.eval()
-                    a = argmax(self.Q(obs[None]))
+                    if not isinstance(obs, tuple):
+                        obs = obs[None]
+                    else:
+                        obs = (obs[0][None], obs[1][None])    # used by LSTMVariant network 
+                    a = argmax(self.Q(obs))
                     self.Q.train()
             else:
                 a = random.randint(0, self.n_actions-1)
@@ -101,7 +108,7 @@ class AbstractAgent():
             self.mad = False
             self.oppo_memory = torch.zeros((1,))
 
-        def state_repr(self, oppo_action, own_action=None, feature=None):
+        def state_repr(self, oppo_action, own_action=None):
             """
             This method takes the opponent action and your own action as input and return an encoded state
 
@@ -112,19 +119,15 @@ class AbstractAgent():
             Returns:
                 An encoded state representation (float tensor).
             """
-            self.check_mad()
-            state_emb = label_encode(oppo_action)
             if 'uni' in self.method:
                 state_emb = oppo_action.float()
             if 'bi' in self.method:
                 assert own_action is not None, 'Make sure you input valid own_action in bi representation'
                 state_emb = torch.cat((oppo_action.float(), own_action.float())) if oppo_action.size() == own_action.size() else None
-            if 'repr' in self.method:
-                assert feature is not None, 'Make sure you input valid feateures in representation'
-                state_emb = (state_emb, feature)
             if 'label' in self.method:
                 state_emb = label_encode(oppo_action)
             if self.method == 'grudgerlabel':
+                self.check_mad()
                 state_emb += 2**len(oppo_action)*self.mad
             return state_emb
         def check_mad(self):
