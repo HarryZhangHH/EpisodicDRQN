@@ -57,8 +57,10 @@ class LSTMVariant(nn.Module):
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc1 = nn.Linear(feature_size, hidden_size)
         self.fc1_bn=nn.BatchNorm1d(hidden_size*2)
-        self.fc2 = nn.Linear(hidden_size*2, output_size)
+        self.fc2 = nn.Linear(hidden_size*2, hidden_size)
+        self.fc2_bn=nn.BatchNorm1d(hidden_size)
         self.dropout1=nn.Dropout(0.25)
+        self.fc3 = nn.Linear(hidden_size, output_size)
     
     def forward(self, x):
         x1, x2 = x[0], x[1]
@@ -72,10 +74,13 @@ class LSTMVariant(nn.Module):
 
         out_lstm, _ = self.lstm(x1, (h0, c0))  # out_lstm: tensor of shape (batch_size, seq_length, hidden_size)
         out_fc1 = self.fc1(x2)
-        x = torch.cat((out_lstm[:, -1, :].view(x1.size(0), self.hidden_size), out_fc1.view(x1.size(0), self.hidden_size)), dim=1)
+        x = torch.cat((out_lstm[:, -1, :].view(x1.size(0), self.hidden_size), out_fc1.view(x1.size(0),-1)), dim=1)
 
         x = F.relu(self.fc1_bn(x))
-        out = self.fc2(x)
+        x = self.dropout1(x)
+        x = self.fc2(x)
+        x = F.relu(self.fc2_bn(x))
+        out = self.fc3(x)
         return out
 
 class A2CNetwork(nn.Module):

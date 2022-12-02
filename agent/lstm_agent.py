@@ -6,7 +6,7 @@ from utils import *
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 TARGET_UPDATE = 10
-HIDDEN_SIZE = 128
+HIDDEN_SIZE = 64
 FEATURE_SIZE = 4
 
 class LSTMAgent(AbstractAgent):
@@ -25,7 +25,7 @@ class LSTMAgent(AbstractAgent):
         self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
         self.play_epsilon = config.play_epsilon
         self.State = self.StateRepr(method=config.state_repr)
-        self.build() if 'repr' not in config.state_repr or self.name == 'LSTM' else self.build2()
+        self.build() if 'repr' not in config.state_repr else self.build2()
         self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
         self.Memory = self.ReplayBuffer(1000)  # an object
         self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
@@ -66,12 +66,13 @@ class LSTMAgent(AbstractAgent):
         
         if self.play_times >= self.config.h and oppo_agent.play_times >= self.config.h:
             self.State.state = self.State.state_repr(self.opponent_action, self.own_action)
-
             self.State.state = torch.permute(self.State.state.view(-1, self.config.h), (1, 0)) # important
 
-            if 'repr' in self.config.state_repr and self.name != 'LSTM':
+            if 'repr' in self.config.state_repr:
                 feature = self.generate_feature(oppo_agent)
                 self.State.state = (self.State.state, feature)
+        else:
+            self.State.state = None
         return int(self.select_action())
 
     def select_action(self):
@@ -103,7 +104,6 @@ class LSTMAgent(AbstractAgent):
         if self.State.state is not None:
             self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
                                                           torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
-            # print(self.State.next_state)
             self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
             # push the transition into ReplayBuffer
         
@@ -112,13 +112,15 @@ class LSTMAgent(AbstractAgent):
         if self.State.state is None:
             return None
 
+        if 'repr' in self.config.state_repr:
+            feature = self.generate_feature(oppo_agent)
+            self.State.next_state = (self.State.next_state.numpy(), feature.numpy())
+            self.State.state = (self.State.state[0].numpy(), self.State.state[1].numpy())
+
         if self.name == 'LSTM':
-            self.Memory.push(self.State.state, action, oppo_agent.own_memory[self.play_times - 1], reward)
+            self.Memory.push(self.State.state, action, int(oppo_agent.own_memory[self.play_times - 1]), reward)
 
         if self.name == 'LSTMQN':
-            if 'repr' in self.config.state_repr:
-                feature = self.generate_feature(oppo_agent)
-                self.State.next_state = (self.State.next_state, feature)
             self.Memory.push(self.State.state, action, self.State.next_state, reward)
         # print(f'Episode {self.play_times}:  {own_action}, {opponent_action}') if self.play_times > self.config.batch_size else None
         self.optimize_model()
@@ -164,18 +166,29 @@ class LSTMAgent(AbstractAgent):
         # convert to PyTorch and define types
         # print(f'1: {state[0]}')
         if self.name == 'LSTM':
-            state = torch.stack(list(state), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)
+            if 'repr' in self.config.state_repr:
+                h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).to(device).view(self.config.batch_size, self.config.h, -1)
+                features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).to(device).view(self.config.batch_size, FEATURE_SIZE)
+                state = (h_action, features)
+            else:
+                state = torch.stack(list(state), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)
             target = torch.tensor(next_state, dtype=torch.int64, device=device)
             outputs = self.PolicyNet(state)
             criterion = nn.CrossEntropyLoss()
 
         elif self.name == 'LSTMQN':
             if 'repr' in self.config.state_repr:
-                h_action = torch.stack(list(np.asarray(state, dtype=object)[:,0]), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)
-                features = torch.stack(list(np.asarray(state, dtype=object)[:,1]), dim=0).to(device).view(self.config.batch_size, FEATURE_SIZE)
+                # test
+                # print(np.array(state, dtype=object)[:,0])
+                # print(np.vstack(np.array(state, dtype=object)[:,0]))
+                # print( torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float64)).view(self.config.batch_size, self.config.h, -1))
+                # print( torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float64)).size())
+                # sys.exit()
+                h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).to(device).view(self.config.batch_size, self.config.h, -1)
+                features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).to(device).view(self.config.batch_size, FEATURE_SIZE)
                 state = (h_action, features)
-                h_action = torch.stack(list(np.asarray(next_state, dtype=object)[:,0]), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)
-                features = torch.stack(list(np.asarray(next_state, dtype=object)[:,1]), dim=0).to(device).view(self.config.batch_size, FEATURE_SIZE)
+                h_action = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,0]).astype(np.float)).to(device).view(self.config.batch_size, self.config.h, -1)
+                features = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,1]).astype(np.float)).to(device).view(self.config.batch_size, FEATURE_SIZE)
                 next_state = (h_action, features)
             else:
                 state = torch.stack(list(state), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)

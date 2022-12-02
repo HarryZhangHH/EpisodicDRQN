@@ -55,8 +55,10 @@ class DQNAgent(AbstractAgent):
             oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
         self.own_action = torch.as_tensor(
             self.own_memory[self.play_times - self.config.h: self.play_times])
-        if self.play_times >= self.config.h:
+        if self.play_times >= self.config.h and oppo_agent.play_times >= self.config.h:
             self.State.state = self.State.state_repr(self.opponent_action, self.own_action)
+        else:
+            self.State.state = None
         return int(self.select_action())
 
     def select_action(self):
