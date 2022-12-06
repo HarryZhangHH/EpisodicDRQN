@@ -190,11 +190,13 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
         agents = lstm_variant_selection(config, agents, env)
 
     for n in range(len(agents)):
-        print('Agent{}: name:{}  final score:{}  play time:{}  times to play D:{}  ratio: {}'
-            .format(n, agents[n].name, agents[n].running_score,
-            len(agents[n].own_memory[:agents[n].play_times]), list(agents[n].own_memory[:agents[n].play_times]).count(1),
-                    list(agents[n].own_memory[:agents[n].play_times]).count(1)/len(agents[n].own_memory[:agents[n].play_times])))
-    print('The reward for total society: {}'.format(env.running_score/len(agents)))
+        print('Agent{}: name:{}  final score:{}  play time:{}  times to play D:{}  ratio: {}  faced D ratio: {}'
+              .format(n, agents[n].name, agents[n].running_score,
+                      len(agents[n].own_memory[:agents[n].play_times]),
+                      list(agents[n].own_memory[:agents[n].play_times]).count(1),
+                      list(agents[n].own_memory[:agents[n].play_times]).count(1) / len(agents[n].own_memory[:agents[n].play_times]),
+                      list(agents[n].oppo_memory[:agents[n].play_times]).count(1) / len(agents[n].oppo_memory[:agents[n].play_times])))
+    print('The reward for total society: {}'.format(env.running_score / len(agents)))
 
 
 
