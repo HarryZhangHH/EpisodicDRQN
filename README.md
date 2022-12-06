@@ -41,9 +41,9 @@ After you successfully run the code, you will have 4 choices. <br />
 Choice **0** is to run the 2-agents benchmark. <br />
 Choice **1** is to test a method with all the other other method in 2-agents setting. <br />
 Choice **2** is to test a reinforcement learning method with another specific method in 2-agents setting. <br />
-Choice **3** is to run the multi-agents benchmark. 
+Choice **3** is to run the multi-agents game. 
 
-The selectable methods: 
+### The selectable methods: 
 ```
 choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
 rl_choices = {'7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
@@ -63,6 +63,13 @@ The first 7 methods are the fix-strategy methods.
 12-a2clstm is a ActorCritic[^4] method using the LSTM. You may need to manually change the `Class Worker` in the `./agent/actor_critic_lstm_agent.py` to your preference of worker number and worker against strategy.
 
 Note that, you can manually change some hyperparameters (like `HIDDEN_SIZE`, `TARGET_UPDATE`) in the specific .py file.
+
+
+### The state representation: 
+```
+choices = {'uni', 'bi', 'unilabel', 'grudgerlabel', 'bi-repr'}
+```
+'uni' is only
 
 [^1]: [Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning](https://arxiv.org/abs/1902.03185)
 [^2]: [DQN](https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html)
