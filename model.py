@@ -62,7 +62,7 @@ class LSTMVariant(nn.Module):
         self.dropout1 = nn.Dropout(0.25)
         self.fc3 = nn.Linear(hidden_size, output_size)
     
-    def forward(self, x: tuple):
+    def forward(self, x):
         x1, x2 = x[0], x[1]
         x1 = x1.type(torch.FloatTensor).to(device)
         x1 = x1.view(x1.size(0), -1, self.input_size)

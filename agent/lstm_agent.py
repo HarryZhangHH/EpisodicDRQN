@@ -2,6 +2,7 @@ import torch.nn as nn
 from agent.abstract_agent import AbstractAgent
 from model import LSTM, LSTMVariant
 from utils import *
+import sys
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -97,13 +98,13 @@ class LSTMAgent(AbstractAgent):
         own_reward = self.running_score
         oppo_reward = oppo_agent.running_score
         own_defect_ratio = calculate_sum(self.own_memory)/self.play_times
-        own_faced_defect_ratio = calculate_sum(self.oppo_memory)/self.play_times
+        own_faced_defect_ratio = calculate_sum(self.opponent_memory)/self.play_times
         oppo_defect_ratio = calculate_sum(oppo_agent.own_memory)/oppo_agent.play_times
-        oppo_faced_defect_ratio = calculate_sum(oppo_agent.oppo_memory)/oppo_agent.play_times
+        oppo_faced_defect_ratio = calculate_sum(oppo_agent.opponent_memory)/oppo_agent.play_times
         own_reward_ratio = own_reward/max_reward
         oppo_reward_ratio = oppo_reward/max_reward
-        own_play_times_ratio = self.play_times/min(1, self.config.n_episodes)
-        oppo_play_times_ratio = oppo_agent.play_times/min(1, self.config.n_episodes)
+        own_play_times_ratio = min(1, self.play_times/self.config.n_episodes)
+        oppo_play_times_ratio = min(1, oppo_agent.play_times/self.config.n_episodes)
         if FEATURE_SIZE == 4:
             return torch.FloatTensor([own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio])
         else:
@@ -129,7 +130,7 @@ class LSTMAgent(AbstractAgent):
         if 'repr' in self.config.state_repr:
             feature = self.generate_feature(oppo_agent)
             self.State.next_state = (self.State.next_state.numpy(), feature.numpy())
-            self.State.state = (self.State.state[0].numpy(), self.State.state[1].numpy())
+            self.State.state = (self.State.state[0].numpy(), self.State.state[1].numpy()) if type(self.State.state[0]) is not np.ndarray else self.State.state
 
         # push the transition into ReplayBuffer
         if self.name == 'LSTM':

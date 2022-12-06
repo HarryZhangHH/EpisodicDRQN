@@ -13,7 +13,7 @@ class AbstractAgent():
     This data will persist between rounds of a match but not between matches.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: object):
         self.config = config
         self.running_score = 0.0
         self.play_times = 0
@@ -22,12 +22,12 @@ class AbstractAgent():
         pass
     __act = act
 
-    def update(self, reward):
+    def update(self, reward: float):
         self.running_score = reward + self.config.discount * self.running_score
         self.play_times += 1
     __update = update
 
-    def optimize(self, action, reward, oppo_agent):
+    def optimize(self, action: int, reward: float, oppo_agent: object):
         pass
     __optimize = optimize
 

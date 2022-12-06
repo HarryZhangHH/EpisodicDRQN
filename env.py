@@ -22,12 +22,15 @@ class Environment():
         for i in range(episodes):
             a1, a2 = agent1.act(agent2), agent2.act(agent1)
             _, r1, r2 = self.step(a1, a2)
-            agent1.update(r1, a1, a2)
-            agent2.update(r2, a2, a1)
-            agent1.optimize(a1, r1, agent2)
-            agent2.optimize(a2, r2, agent1)
+            self.optimize(agent1, agent2, a1, a2, r1, r2)
         return r1, r2
-    
+
+    def optimize(self, agent1: object, agent2: object, a1: int, a2: int, r1: float, r2: float):
+        agent1.update(r1, a1, a2)
+        agent2.update(r2, a2, a1)
+        agent1.optimize(a1, r1, agent2)
+        agent2.optimize(a2, r2, agent1)
+
     def step(self, a1: int, a2: int):
         """
         action:

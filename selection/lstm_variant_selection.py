@@ -96,8 +96,7 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
             for me in update_memory.memory:
                 agent1, agent2 = agents[me[0]], agents[me[1]]
                 a1, a2, r1, r2 = me[2], me[3], me[4], me[5]
-                agent1.update(r1, a1, a2)
-                agent2.update(r2, a2, a1)
+                env.optimize(agent1, agent2, a1, a2, r1, r2)
                 society_reward = society_reward + r1 + r2
             
             # process the state and next_state
@@ -131,7 +130,7 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
                     agent1.SelectionTargetNN.load_state_dict(agent1.SelectionPolicyNN.state_dict())
 
                 # epsilon decay
-                if agent1.config.select_epsilon > agent1.config.min_epsilon:
+                if agent1.config.select_epsilon > agent1.config.min_epsilon and agent1.play_times%5 == 0:
                     agent1.config.select_epsilon *= agent1.config.epsilon_decay
         env.update(society_reward)
     return agents
