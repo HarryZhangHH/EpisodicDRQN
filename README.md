@@ -69,7 +69,12 @@ Note that, you can manually change some hyperparameters (like `HIDDEN_SIZE`, `TA
 ```
 choices = {'uni', 'bi', 'unilabel', 'grudgerlabel', 'bi-repr'}
 ```
-'uni' is only
+'uni' only uses the own h previous actions as state for playing part. <br />
+'bi' uses both the self and opponent h previous actions as state for playing part. <br />
+'unilabel' uses the label encoding method to encode the own h previous actions as state for playing part, which is only applicable for 7-qLearning. <br />
+'bi-repr' uses not only the self and opponent h previous actions but also features (like own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio) as state for playing part. <br />
+
+
 
 [^1]: [Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning](https://arxiv.org/abs/1902.03185)
 [^2]: [DQN](https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html)
