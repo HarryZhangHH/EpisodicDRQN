@@ -36,13 +36,15 @@ Example command line arguments, using
 ```
 python main.py --h=10 --state_repr=bi --n_episode=10000 --batch_size=64
 ```
-## When running
+
+# When running
 After you successfully run the code, you will have 4 choices. <br />
 Choice **0** is to run the 2-agents benchmark. <br />
 Choice **1** is to test a method with all the other other method in 2-agents setting. <br />
 Choice **2** is to test a reinforcement learning method with another specific method in 2-agents setting. <br />
 Choice **3** is to run the multi-agents game. 
 
+## Play 
 ### The selectable methods: 
 ```
 choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
@@ -69,12 +71,17 @@ Note that, you can manually change some hyperparameters (like `HIDDEN_SIZE`, `TA
 ```
 choices = {'uni', 'bi', 'unilabel', 'grudgerlabel', 'bi-repr'}
 ```
-'uni' only uses the own h previous actions as state for playing part. <br />
-'bi' uses both the self and opponent h previous actions as state for playing part. <br />
-'unilabel' uses the label encoding method to encode the own h previous actions as state for playing part, which is only applicable for 7-qLearning. <br />
-'bi-repr' uses not only the self and opponent h previous actions but also features (like own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio) as state for playing part. <br />
+'uni' only uses the own h previous actions as state for play. <br />
+'bi' uses both the self and opponent h previous actions as state for play. <br />
+'unilabel' uses the label encoding method to encode the own h previous actions as state for play, which is only applicable for 7-qLearning. <br />
+'bi-repr' uses not only the self and opponent h previous actions but also features (like own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio) as state for play. <br />
 
-
+## Select
+'All Random': Select opponents randomly. <br />
+'Tabular Q Learning':  <br />
+'DQN': Use all agent's previous h actions as state. Use deep neural network as Q-Network <br />
+'LSTM-QN': Use all agent's previous h actions as state. Use LSTM as Q-Network <br />
+'LSTM-QN Variant': Use all agent's previous h actions, discounted reward, playing times, defecttion ratio, etc. as state. Use <br />
 
 [^1]: [Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning](https://arxiv.org/abs/1902.03185)
 [^2]: [DQN](https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html)
