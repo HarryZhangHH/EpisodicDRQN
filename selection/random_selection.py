@@ -1,7 +1,7 @@
 import random
 from tqdm import tqdm
 
-def random_selection(config: object, agents: dict[object], env: object):
+def random_selection(config: object, agents: dict, env: object):
     n_agents = len(agents)
     for i in tqdm(range(0, config.n_episodes)):
         society_reward = 0

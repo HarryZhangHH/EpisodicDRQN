@@ -16,7 +16,7 @@ FEATURE_SIZE = 4
 NUM_LAYER = 1
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def lstm_variant_selection(config: object, agents: dict[object], env: object):
+def lstm_variant_selection(config: object, agents: dict, env: object):
     """
     DQN-based selection method - using ensemble LSTM (LSTM-VARIANT)
 

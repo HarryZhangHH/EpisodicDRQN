@@ -14,7 +14,7 @@ HIDDEN_SIZE = 128
 NUM_LAYER = 1
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def dqn_selection(config: object, agents: dict[object], env: object, rnn: bool = False):
+def dqn_selection(config: object, agents: dict, env: object, rnn: bool = False):
     """
     DQN selection method (benchmark2) - using normal NN or LSTM
 
