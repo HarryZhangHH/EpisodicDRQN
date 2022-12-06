@@ -7,7 +7,7 @@ from utils import *
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 TARGET_UPDATE = 10
 HIDDEN_SIZE = 128
-FEATURE_SIZE = 4
+FEATURE_SIZE = 6
 NUM_LAYER = 1
 
 class LSTMAgent(AbstractAgent):
@@ -100,7 +100,12 @@ class LSTMAgent(AbstractAgent):
         oppo_defect_ratio = calculate_sum(oppo_agent.own_memory)/oppo_agent.play_times
         own_reward_ratio = own_reward/max_reward
         oppo_reward_ratio = oppo_reward/max_reward
-        return torch.FloatTensor([own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio])
+        own_play_times_ratio = self.play_times/min(1, self.config.n_episodes)
+        oppo_play_times_ratio = oppo_agent.play_times/min(1, self.config.n_episodes)
+        if FEATURE_SIZE == 4:
+            return torch.FloatTensor([own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio])
+        else:
+            return torch.FloatTensor([own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio, own_play_times_ratio, oppo_play_times_ratio])
         
     def update(self, reward: float, own_action: int, opponent_action: int):
         super(LSTMAgent, self).update(reward)
