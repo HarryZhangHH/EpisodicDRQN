@@ -6,7 +6,7 @@ class StrategyAgent(AbstractAgent):
     An agent using fixed strategy
     """
 
-    def __init__(self, name, config):
+    def __init__(self, name: str, config: object):
         self.name = name
         super(StrategyAgent, self).__init__(config)
         self.own_memory = []
@@ -15,7 +15,7 @@ class StrategyAgent(AbstractAgent):
     def roll(self):
         return random.randint(0,1)
 
-    def act(self, oppo_agent):
+    def act(self, oppo_agent: object):
         if self.name == 'ALLC':
             return 0
         elif self.name == 'ALLD':
@@ -56,7 +56,7 @@ class StrategyAgent(AbstractAgent):
             else:
                 return self.opponent_memory[-1]
 
-    def update(self, reward, own_action, opponent_action):
+    def update(self, reward: float, own_action: int, opponent_action: int):
         super(StrategyAgent, self).update(reward)
         self.own_memory.append(own_action)
         self.opponent_memory.append(opponent_action)

@@ -6,14 +6,14 @@ import torch.nn.functional as F
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class NeuralNetwork(nn.Module):
-    def __init__(self, input_size, output_size, num_hidden):
+    def __init__(self, input_size: int, output_size: int, hidden_size: int):
         super(NeuralNetwork, self).__init__()
         self.input_size = input_size
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(input_size, num_hidden),  # hidden layer
-            nn.BatchNorm1d(num_hidden),
+            nn.Linear(input_size, hidden_size),  # hidden layer
+            nn.BatchNorm1d(hidden_size),
             nn.ReLU(),
-            nn.Linear(num_hidden, output_size)
+            nn.Linear(hidden_size, output_size)
         )
 
     def forward(self, x):
@@ -23,7 +23,7 @@ class NeuralNetwork(nn.Module):
         return logits
 
 class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size):
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int, output_size: int):
         super(LSTM, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -49,17 +49,17 @@ class LSTM(nn.Module):
         return out
 
 class LSTMVariant(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, feature_size, output_size):
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int, feature_size: int, output_size: int):
         super(LSTMVariant, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc1 = nn.Linear(feature_size, hidden_size)
-        self.fc1_bn=nn.BatchNorm1d(hidden_size*2)
+        self.fc1_bn = nn.BatchNorm1d(hidden_size*2)
         self.fc2 = nn.Linear(hidden_size*2, hidden_size)
-        self.fc2_bn=nn.BatchNorm1d(hidden_size)
-        self.dropout1=nn.Dropout(0.25)
+        self.fc2_bn = nn.BatchNorm1d(hidden_size)
+        self.dropout1 = nn.Dropout(0.25)
         self.fc3 = nn.Linear(hidden_size, output_size)
     
     def forward(self, x):
@@ -85,22 +85,22 @@ class LSTMVariant(nn.Module):
 
 class A2CNetwork(nn.Module):
 
-    def __init__(self, input_size, output_size, num_hidden):
+    def __init__(self, input_size: int, output_size: int, hidden_size: int):
         super(A2CNetwork, self).__init__()
         # predict how much reward the agent will receive until the end of the episode
         self.input_size = input_size
         self.critic = nn.Sequential(
-            nn.Linear(input_size, num_hidden),  # hidden layer
-            nn.BatchNorm1d(num_hidden),
+            nn.Linear(input_size, hidden_size),  # hidden layer
+            nn.BatchNorm1d(hidden_size),
             nn.ReLU(),
-            nn.Linear(num_hidden, 1)
+            nn.Linear(hidden_size, 1)
         )
         #  pick actions to perform
         self.actor = nn.Sequential(
-            nn.Linear(input_size, num_hidden),  # hidden layer
-            nn.BatchNorm1d(num_hidden),
+            nn.Linear(input_size, hidden_size),  # hidden layer
+            nn.BatchNorm1d(hidden_size),
             nn.ReLU(),
-            nn.Linear(num_hidden, output_size),
+            nn.Linear(hidden_size, output_size),
             nn.Softmax(dim=-1)
         )
 
@@ -137,7 +137,7 @@ class A2CNetwork(nn.Module):
 
 class A2CLSTM(nn.Module):
 
-    def __init__(self, input_size, hidden_size, num_layers, output_size):
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int, output_size: int):
         super(A2CLSTM, self).__init__()
         # predict how much reward the agent will receive until the end of the episode
         self.input_size = input_size

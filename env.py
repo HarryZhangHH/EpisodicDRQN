@@ -13,12 +13,12 @@ class Environment():
     2R > T+S
     """
     
-    def __init__(self, config):
+    def __init__(self, config: object):
         self.config = config
         self.episode = 0
         self.running_score = 0.0
 
-    def play(self, agent1, agent2, episodes):
+    def play(self, agent1: object, agent2: object, episodes: int):
         for i in range(episodes):
             a1, a2 = agent1.act(agent2), agent2.act(agent1)
             _, r1, r2 = self.step(a1, a2)
@@ -28,7 +28,7 @@ class Environment():
             agent2.optimize(a2, r2, agent1)
         return r1, r2
     
-    def step(self, a1, a2):
+    def step(self, a1: int, a2: int):
         """
         action:
         0 = cooperate
@@ -49,7 +49,7 @@ class Environment():
         
         return episode, r1, r2
 
-    def update(self, reward):
+    def update(self, reward: int):
         self.running_score = reward + self.config.discount * self.running_score
 
     def reset(self):

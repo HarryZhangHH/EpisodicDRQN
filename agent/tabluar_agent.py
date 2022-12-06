@@ -13,14 +13,14 @@ class TabularAgent(AbstractAgent):
     Constructor. Called once at the start of each match.
     This data will persist between rounds of a match but not between matches.
     """
-    def __init__(self, name, config):
+    def __init__(self, name: str, config: object):
         """
         Parameters
         ----------
-        name: Learning method
-        config.h: every agents' most recent h actions are visiable to others which is composed to state
-        State, EpsilonPolicy and Memory are class object
-        Q_table: a tensor (matrix) storing Q values of each state-action pair
+        name : str
+            Learning method
+        config : object
+            config.h: every agents' most recent h actions are visiable to others which is composed to state
         """
         super(TabularAgent, self).__init__(config)
         # assert 'label' in config.state_repr, 'Note that tabular method can only use the label encoded state representation'
@@ -31,13 +31,13 @@ class TabularAgent(AbstractAgent):
         self.own_memory = torch.zeros((config.n_episodes * 1000,))
         self.opponent_memory = torch.zeros((config.n_episodes * 1000,))
         self.State = self.StateRepr(method='unilabel', mad_threshold=MADTHRESHOLD)              # an object
-        self.Q_table = torch.zeros((2 ** self.h * self.State.len(), 2))
+        self.Q_table = torch.zeros((2 ** self.h * self.State.len(), 2))     # Q_table: a tensor (matrix) storing Q values of each state-action pair
         # self.Q_table = torch.full((2**config.h, 2), float('-inf'))
         self.play_epsilon = config.play_epsilon
         self.Policy = self.EpsilonPolicy(self.Q_table, self.play_epsilon, self.config.n_actions)            # an object
         self.Memory = self.ReplayBuffer(10000)
 
-    def act(self, oppo_agent):
+    def act(self, oppo_agent: object):
         """
         Agent act based on the oppo_agent's information
         Parameters
@@ -56,10 +56,10 @@ class TabularAgent(AbstractAgent):
         # label encode
         if self.play_times >= self.h:
             self.State.state = self.State.state_repr(self.opponent_action)
-        return int(self.select_action())
+        return int(self.__select_action())
 
-    def select_action(self):
-        # selection action based on epsilon greedy policy
+    def __select_action(self):
+        """ selection action based on epsilon greedy policy """
         a = self.Policy.sample_action(self.State.state)
 
         # epsilon decay
@@ -68,7 +68,7 @@ class TabularAgent(AbstractAgent):
         self.Policy.set_epsilon(self.play_epsilon)
         return a
 
-    def update(self, reward, own_action, opponent_action):
+    def update(self, reward: float, own_action: int, opponent_action: int):
         super(TabularAgent, self).update(reward)
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
@@ -84,7 +84,7 @@ class TabularAgent(AbstractAgent):
                                                        (reward + self.config.discount * (torch.max(self.Q_table[self.State.next_state])) - self.Q_table[self.State.state, own_action])
 
     def mc_update(self):
-        # MC update, first-visit, on-policy
+        """ MC update, first-visit, on-policy """
         state_buffer = []
         reward_buffer = list(sub[3] for sub in self.Memory.memory)
         for idx, me in enumerate(self.Memory.memory):
@@ -96,7 +96,7 @@ class TabularAgent(AbstractAgent):
                 state_buffer.append(state)
 
     def reset(self):
-        # reset all attribute values expect Q_table for episode-end game
+        """ reset all attribute values expect Q_table for episode-end game """
         super(TabularAgent, self).reset()
         self.own_memory = torch.zeros((self.config.n_episodes * 1000,))
         self.opponent_memory = torch.zeros((self.config.n_episodes * 1000,))

@@ -6,18 +6,19 @@ from utils import *
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 TARGET_UPDATE = 10
-HIDDEN_SIZE = 64
+HIDDEN_SIZE = 128
 FEATURE_SIZE = 4
+NUM_LAYER = 1
 
 class LSTMAgent(AbstractAgent):
     # h is every agents' most recent h actions are visiable to others which is composed to state
-    def __init__(self, name, config):
+    def __init__(self, name: str, config: object):
         """
 
         Parameters
         ----------
-        config
-        name = LSTM or LSTMQN
+        config: object
+        name : str = LSTM or LSTMQN
         """
         super(LSTMAgent, self).__init__(config)
         self.name = name
@@ -32,22 +33,24 @@ class LSTMAgent(AbstractAgent):
         self.loss = []
 
     def build(self):
-        """PolicyNet and TargetNet are objects"""
+        """ Build a normal LSTM network 
+        PolicyNet and TargetNet are objects """
         input_size = 2 if self.config.state_repr == 'bi' else 1
-        self.PolicyNet = LSTM(input_size, HIDDEN_SIZE, 1, self.config.n_actions).to(device)
-        self.TargetNet = LSTM(input_size, HIDDEN_SIZE, 1, self.config.n_actions).to(device)
+        self.PolicyNet = LSTM(input_size, HIDDEN_SIZE, NUM_LAYER, self.config.n_actions).to(device)
+        self.TargetNet = LSTM(input_size, HIDDEN_SIZE, NUM_LAYER, self.config.n_actions).to(device)
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.TargetNet.eval())
     
     def build2(self):
+        """ Build a variant LSTM network, an ensemble LSTM and DENSE Network """
         input_size = 2 if 'bi' in self.config.state_repr else 1
-        self.PolicyNet = LSTMVariant(input_size, HIDDEN_SIZE, 1, FEATURE_SIZE, self.config.n_actions).to(device)
-        self.TargetNet = LSTMVariant(input_size, HIDDEN_SIZE, 1, FEATURE_SIZE, self.config.n_actions).to(device)
+        self.PolicyNet = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE, self.config.n_actions).to(device)
+        self.TargetNet = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE, self.config.n_actions).to(device)
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.TargetNet.eval())
 
         
-    def act(self, oppo_agent):
+    def act(self, oppo_agent: object):
         """
         Agent act based on the oppo_agent's information
         Parameters
@@ -56,7 +59,7 @@ class LSTMAgent(AbstractAgent):
 
         Returns
         -------
-        action index
+        action index: int
         """
         # get opponent's last h move
         self.opponent_action = torch.as_tensor(
@@ -73,10 +76,10 @@ class LSTMAgent(AbstractAgent):
                 self.State.state = (self.State.state, feature)
         else:
             self.State.state = None
-        return int(self.select_action())
+        return int(self.__select_action())
 
-    def select_action(self):
-        # selection action based on epsilon greedy policy
+    def __select_action(self):
+        """selection action based on epsilon greedy policy """
         a = self.Policy.sample_action(self.State.state)
 
         # epsilon decay
@@ -85,7 +88,11 @@ class LSTMAgent(AbstractAgent):
         self.Policy.set_epsilon(self.play_epsilon)
         return a
 
-    def generate_feature(self, oppo_agent):
+    def generate_feature(self, oppo_agent: object):
+        """ 
+        Generate extra features 
+        own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio
+        """
         max_reward = self.config.temptation/(1-self.config.discount)
         own_reward = self.running_score
         oppo_reward = oppo_agent.running_score
@@ -95,19 +102,19 @@ class LSTMAgent(AbstractAgent):
         oppo_reward_ratio = oppo_reward/max_reward
         return torch.FloatTensor([own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio])
         
-    def update(self, reward, own_action, opponent_action):
+    def update(self, reward: float, own_action: int, opponent_action: int):
         super(LSTMAgent, self).update(reward)
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
-        self.State.oppo_memory = self.opponent_memory[:self.play_times]
+        # self.State.oppo_memory = self.opponent_memory[:self.play_times]
 
         if self.State.state is not None:
             self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
                                                           torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
             self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
-            # push the transition into ReplayBuffer
         
-    def optimize(self, action, reward, oppo_agent):
+    def optimize(self, action: int, reward: float, oppo_agent: object):
+        """ push the trajectoriy into the ReplayBuffer and optimize the model """
         super(LSTMAgent, self).optimize(action, reward, oppo_agent)
         if self.State.state is None:
             return None
@@ -117,45 +124,20 @@ class LSTMAgent(AbstractAgent):
             self.State.next_state = (self.State.next_state.numpy(), feature.numpy())
             self.State.state = (self.State.state[0].numpy(), self.State.state[1].numpy())
 
+        # push the transition into ReplayBuffer
         if self.name == 'LSTM':
-            self.Memory.push(self.State.state, action, int(oppo_agent.own_memory[self.play_times - 1]), reward)
-
+            self.Memory.push(self.State.state, action, int(oppo_agent.own_memory[oppo_agent.play_times - 1]), reward)
         if self.name == 'LSTMQN':
             self.Memory.push(self.State.state, action, self.State.next_state, reward)
+
         # print(f'Episode {self.play_times}:  {own_action}, {opponent_action}') if self.play_times > self.config.batch_size else None
-        self.optimize_model()
+        self.__optimize_model()
         # Update the target network, copying all weights and biases in DQN
         if self.play_times % TARGET_UPDATE == 0:
             self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
 
-    def optimize_model(self):
-        """ Train our model """
-        def compute_q_vals(Q, states, actions):
-            """
-            This method returns Q values for given state action pairs.
-
-            Args:
-                Q: Q-net  (object)
-                states: a tensor of states. Shape: batch_size x obs_dim
-                actions: a tensor of actions. Shape: Shape: batch_size x 1
-            Returns:
-                A torch tensor filled with Q values. Shape: batch_size x 1.
-            """
-            return torch.gather(Q(states), 1, actions)
-        def compute_targets(Q, rewards, next_states, discount_factor):
-            """
-            This method returns targets (values towards which Q-values should move).
-
-            Args:
-                Q: Q-net  (object)
-                rewards: a tensor of rewards. Shape: Shape: batch_size x 1
-                next_states: a tensor of states. Shape: batch_size x obs_dim
-                discount_factor: discount
-            Returns:
-                A torch tensor filled with target values. Shape: batch_size x 1.
-            """
-            return rewards + discount_factor * torch.max(Q(next_states), 1)[0].reshape((-1, 1))
-
+    def __optimize_model(self):
+        """ Train and optimize our model """
         # don't learn without some decent experience
         if len(self.Memory.memory) < self.config.batch_size:
             return None
@@ -164,14 +146,13 @@ class LSTMAgent(AbstractAgent):
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
         state, action, next_state, reward = zip(*transitions)
         # convert to PyTorch and define types
-        # print(f'1: {state[0]}')
         if self.name == 'LSTM':
             if 'repr' in self.config.state_repr:
                 h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).to(device).view(self.config.batch_size, self.config.h, -1)
                 features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).to(device).view(self.config.batch_size, FEATURE_SIZE)
                 state = (h_action, features)
             else:
-                state = torch.stack(list(state), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)
+                state = torch.stack(list(state), dim=0).view(self.config.batch_size, self.config.h, -1).to(device)
             target = torch.tensor(next_state, dtype=torch.int64, device=device)
             outputs = self.PolicyNet(state)
             criterion = nn.CrossEntropyLoss()
@@ -184,15 +165,15 @@ class LSTMAgent(AbstractAgent):
                 # print( torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float64)).view(self.config.batch_size, self.config.h, -1))
                 # print( torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float64)).size())
                 # sys.exit()
-                h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).to(device).view(self.config.batch_size, self.config.h, -1)
-                features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).to(device).view(self.config.batch_size, FEATURE_SIZE)
+                h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).view(self.config.batch_size, self.config.h, -1).to(device)
+                features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).view(self.config.batch_size, FEATURE_SIZE).to(device)
                 state = (h_action, features)
-                h_action = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,0]).astype(np.float)).to(device).view(self.config.batch_size, self.config.h, -1)
-                features = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,1]).astype(np.float)).to(device).view(self.config.batch_size, FEATURE_SIZE)
+                h_action = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,0]).astype(np.float)).view(self.config.batch_size, self.config.h, -1).to(device)
+                features = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,1]).astype(np.float)).view(self.config.batch_size, FEATURE_SIZE).to(device)
                 next_state = (h_action, features)
             else:
-                state = torch.stack(list(state), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)
-                next_state = torch.stack(list(next_state), dim=0).to(device).view(self.config.batch_size, self.config.h, -1)
+                state = torch.stack(list(state), dim=0).view(self.config.batch_size, self.config.h, -1).to(device)
+                next_state = torch.stack(list(next_state), dim=0).view(self.config.batch_size, self.config.h, -1).to(device)
             action = torch.tensor(action, dtype=torch.int64, device=device)[:,None]  # Need 64 bit to use them as index
             reward = torch.tensor(reward, dtype=torch.float, device=device)[:,None]
             criterion = nn.SmoothL1Loss()

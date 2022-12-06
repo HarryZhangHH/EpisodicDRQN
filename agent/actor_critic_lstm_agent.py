@@ -40,7 +40,7 @@ class ActorCriticLSTMAgent(AbstractAgent):
             self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
             self.Workers = Worker(self.config)
 
-    def act(self, oppo_agent):
+    def act(self, oppo_agent: object):
         """
         Agent act based on the oppo_agent's information
         Parameters
@@ -61,16 +61,16 @@ class ActorCriticLSTMAgent(AbstractAgent):
             self.State.state = self.State.state_repr(self.opponent_action, self.own_action)
         else:
             self.State.state = None
-        return int(self.select_action())
+        return int(self.__select_action())
 
-    def select_action(self):
+    def __select_action(self):
         # selection action based on epsilon greedy policy
         self.State.state = torch.permute(self.State.state.view(-1, self.config.h), (1, 0)) if self.State.state is not None else None # important
         a = self.PolicyNet.act(self.State.state[None]) if self.State.state is not None else random.randint(0, self.config.n_actions-1)
         # self.PolicyNet.evaluate_action(self.State.state[None], torch.tensor(a)) if self.State.state is not None else None
         return a
 
-    def update(self, reward, own_action, opponent_action):
+    def update(self, reward: float, own_action: int, opponent_action: int):
         super(ActorCriticLSTMAgent, self).update(reward)
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
@@ -131,7 +131,7 @@ class ActorCriticLSTMAgent(AbstractAgent):
             f'Your action: {self.own_memory[self.play_times - 20:self.play_times]}\nOppo action: {self.opponent_memory[self.play_times - 20:self.play_times]}')
 
 class Worker(object):
-    def __init__(self, config):
+    def __init__(self, config: object):
         self.env = Environment(config)
         self.config = config
         self.workers = []
@@ -146,7 +146,7 @@ class Worker(object):
         for _ in range(len(self.opponents)):
             self.workers.append(ActorCriticLSTMAgent('Worker', self.config))
 
-    def set_batch(self, PolicyNet, Memory):
+    def set_batch(self, PolicyNet: object, Memory: object):
         for idx, worker in enumerate(self.workers):
             worker.PolicyNet.load_state_dict(PolicyNet.state_dict())
             worker.PolicyNet.eval()

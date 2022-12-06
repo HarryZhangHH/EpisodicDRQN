@@ -19,7 +19,7 @@ class SelectMemory(Memory):
     def push(self, *args):
         self.memory.append(Agent(*args))
 
-def tabular_selection(config, agents, env):
+def tabular_selection(config: object, agents: dict[object], env: object):
     """
     Tabular selection method (benchmark)
     Args

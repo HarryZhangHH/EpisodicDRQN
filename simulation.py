@@ -121,7 +121,7 @@ def twoSimulate(strategies, num, config, delta = 0.0001):
 ########################################################################################################################
 
 # multi-agent PD benchmark
-MULTI_SELECTION_METHOD = 'LSTM'
+MULTI_SELECTION_METHOD = 'LSTM-VAR'
 def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METHOD):
     """
     Multi-agent simulation
@@ -141,6 +141,7 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
     lst.append(int(input("Enter number of fix strategy agents : ")))
     lst.append(int(input("Enter number of tabular q-learning agents : ")))
     lst.append(int(input("Enter number of dqn agents : ")))
+    lst.append(int(input("Enter number of lstm-predict agents : ")))
     lst.append(int(input("Enter number of lstmqn agents : ")))
     # lst.append(int(input("Enter number of a2c agents : ")))
     # lst.append(int(input("Enter number of a2c-lstm agents : ")))
@@ -154,11 +155,14 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
         for _ in range(n):
             if idx == 0:
                 agents[index] = constructAgent(strategies[random.randint(0, 6)], config)  # Fix strategy
+                # agents[index] = constructAgent('TitForTat', config)
             if idx == 1:
                 agents[index] = constructAgent('QLearning', config)
             if idx == 2:
                 agents[index] = constructAgent('DQN', config)
             if idx == 3:
+                agents[index] = constructAgent('LSTM', config)
+            if idx == 4:
                 agents[index] = constructAgent('LSTMQN', config)
             print(f'initialize Agent {index}', end=' ')
             print(agents[index].name)
@@ -181,6 +185,9 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
     
     if selection_method == 'LSTM':
         agents = dqn_selection(config, agents, env, True)
+    
+    if selection_method == 'LSTM-VAR':
+        agents = lstm_variant_selection(config, agents, env)
 
     for n in range(len(agents)):
         print('Agent{}: name:{}  final score:{}  play time:{}  times to play D:{}  ratio: {}'

@@ -25,7 +25,7 @@ parser.add_argument('--learning_rate', default=1e-3, type=float, help='The learn
 # --------------------------------------------------------------------------- #
 
 class Config():
-    def __init__(self, config):
+    def __init__(self, config: dict):
         self.parse_config(**config)
     
     def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, epsilon_decay, min_epsilon, alpha, n_actions, h, state_repr, batch_size, learning_rate):

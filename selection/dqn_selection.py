@@ -6,59 +6,40 @@ import torch.nn as nn
 from collections import namedtuple, deque
 
 from model import NeuralNetwork, LSTM
-from selection.memory import Memory
+from selection.memory import UpdateMemory, ReplayBuffer
 from utils import *
 
 TARGET_UPDATE = 10
-NUM_HIDDEN = 128
+HIDDEN_SIZE = 128
+NUM_LAYER = 1
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-Agent = namedtuple('Agent', ['agent_1', 'agent_2', 'action_1', 'action_2', 'reward_1', 'reward_2'])
-ReplayBuffer = namedtuple('ReplyBuffer', ['state', 'action', 'reward', 'next_state'])
 
-class UpdateMemory(Memory):
+def dqn_selection(config: object, agents: dict[object], env: object, rnn: bool = False):
     """
-    Used for multi-agent games
-    """
-    def __init__(self, capacity):
-        super(UpdateMemory, self).__init__(capacity)
+    DQN selection method (benchmark2) - using normal NN or LSTM
 
-    def push(self, *args):
-        self.memory.append(Agent(*args))
-
-class SelectMemory(Memory):
-    """
-    Replay Buffer
-    """
-    def __init__(self, capacity):
-        super(SelectMemory, self).__init__(capacity)
-
-    def push(self, *args):
-        self.memory.append(ReplayBuffer(*args))
-
-def feature_extraction(state, ):
-    pass 
-
-def dqn_selection(config, agents, env, rnn):
-    """
-    DQN selection method (benchmark2)
     Parameters
     ----------
     config: object
-    agents: dict of n objcts
+    agents: dict[object]
+        dictionary of n unupdated agents
     env: object
+    rnn: boolean
+        default False: not use LSTM as the function approximator nextwork
 
     Returns
     -------
-    agents
+    agents: dict[object]
+        dictionary of n unupdated agents
     """
     # construct selection network
     n_agents = len(agents)
     for n in agents:
         agent = agents[n]
-        agent.SelectionPolicyNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN).to(device) if not rnn else LSTM(n_agents, NUM_HIDDEN, 1, n_agents-1).to(device)
-        agent.SelectionTargetNN = NeuralNetwork(n_agents*config.h, n_agents-1, NUM_HIDDEN).to(device) if not rnn else LSTM(n_agents, NUM_HIDDEN, 1, n_agents-1).to(device)
+        agent.SelectionPolicyNN = NeuralNetwork(n_agents*config.h, n_agents-1, HIDDEN_SIZE).to(device) if not rnn else LSTM(n_agents, HIDDEN_SIZE, NUM_LAYER, n_agents-1).to(device)
+        agent.SelectionTargetNN = NeuralNetwork(n_agents*config.h, n_agents-1, HIDDEN_SIZE).to(device) if not rnn else LSTM(n_agents, HIDDEN_SIZE, NUM_LAYER, n_agents-1).to(device)
         agent.SelectionTargetNN.load_state_dict(agent.SelectionPolicyNN.state_dict())
-        agent.SelectMemory = SelectMemory(1000)
+        agent.SelectMemory = ReplayBuffer(1000)
         agent.SelectOptimizer = torch.optim.Adam(agent.SelectionPolicyNN.parameters(), lr=config.learning_rate)
 
     # select using rl based on selection epsilon
@@ -86,6 +67,7 @@ def dqn_selection(config, agents, env, rnn):
         else:
             state = torch.stack(state, dim=0)
             state = state.view(n_agents*config.h).to(device) if not rnn else state.T.to(device)
+
             # select opponent based on SelectionNN
             for n in agents:
                 # select action by epsilon greedy
@@ -103,7 +85,8 @@ def dqn_selection(config, agents, env, rnn):
                 a1, a2 = agent1.act(agent2), agent2.act(agent1)
                 _, r1, r2 = env.step(a1, a2)
                 update_memory.push(n, m, a1, a2, r1, r2)
-            # update
+
+            # update based on the memory
             for me in update_memory.memory:
                 agent1, agent2 = agents[me[0]], agents[me[1]]
                 a1, a2, r1, r2 = me[2], me[3], me[4], me[5]
@@ -111,6 +94,7 @@ def dqn_selection(config, agents, env, rnn):
                 agent2.update(r2, a2, a1)
                 society_reward = society_reward + r1 + r2
 
+            # process the next_state
             next_state = []
             for n in agents:
                 agent = agents[n]
@@ -120,6 +104,7 @@ def dqn_selection(config, agents, env, rnn):
             next_state = torch.stack(next_state, dim=0)
             next_state = next_state.view(n_agents*config.h).to(device) if not rnn else next_state.T.to(device)
 
+            # push trajectories into Selection ReplayBuffer(Memory) and optimize the model
             losses = []
             for me in update_memory.memory:
                 agent1, agent2 = agents[me[0]], agents[me[1]]
@@ -127,7 +112,7 @@ def dqn_selection(config, agents, env, rnn):
                 action = me[1]-1 if me[1]>me[0] else me[1]
                 agent1.SelectMemory.push(state, action, reward, next_state)
                 agent1.SelectionPolicyNN.train()
-                loss = optimize_model(agent1, n_agents, rnn)
+                loss = __optimize_model(agent1, n_agents, rnn)
                 losses.append(loss) if loss is not None else None
                 # Update the target network, copying all weights and biases in DQN
                 if agent1.play_times % TARGET_UPDATE == 0:
@@ -136,39 +121,11 @@ def dqn_selection(config, agents, env, rnn):
                 # epsilon decay
                 if agent1.config.select_epsilon > agent1.config.min_epsilon:
                     agent1.config.select_epsilon *= agent1.config.epsilon_decay
-            # print(losses) if len(losses) != 0 else None
         env.update(society_reward)
     return agents
 
-def optimize_model(agent, n_agents, rnn):
+def __optimize_model(agent: object, n_agents: int, rnn: bool):
     """ Train our model """
-    def compute_q_vals(Q, states, actions):
-        """
-        This method returns Q values for given state action pairs.
-
-        Args:
-            Q: Q-net  (object)
-            states: a tensor of states. Shape: batch_size x obs_dim
-            actions: a tensor of actions. Shape: Shape: batch_size x 1
-        Returns:
-            A torch tensor filled with Q values. Shape: batch_size x 1.
-        """
-        return torch.gather(Q(states), 1, actions)
-
-    def compute_targets(Q, rewards, next_states, discount_factor):
-        """
-        This method returns targets (values towards which Q-values should move).
-
-        Args:
-            Q: Q-net  (object)
-            rewards: a tensor of rewards. Shape: Shape: batch_size x 1
-            next_states: a tensor of states. Shape: batch_size x obs_dim
-            discount_factor: discount
-        Returns:
-            A torch tensor filled with target values. Shape: batch_size x 1.
-        """
-        return rewards + discount_factor * torch.max(Q(next_states), 1)[0].reshape((-1, 1))
-
     # don't learn without some decent experience
     if agent.SelectMemory.__len__() < agent.config.batch_size:
         return None

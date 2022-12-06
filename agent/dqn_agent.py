@@ -10,13 +10,13 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class DQNAgent(AbstractAgent):
     # h is every agents' most recent h actions are visiable to others which is composed to state
-    def __init__(self, name, config):
+    def __init__(self, name: str, config: object):
         """
 
         Parameters
         ----------
-        config
-        name = DQN
+        config : object
+        name: str = DQN
         """
         super(DQNAgent, self).__init__(config)
         self.name = name
@@ -26,7 +26,7 @@ class DQNAgent(AbstractAgent):
         self.State = self.StateRepr(method=config.state_repr)
         self.build()
         self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
-        self.Memory = self.ReplayBuffer(100)  # an object
+        self.Memory = self.ReplayBuffer(1000)  # an object
         self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
         self.loss = []
 
@@ -39,7 +39,7 @@ class DQNAgent(AbstractAgent):
         print(self.TargetNet.eval())
         
 
-    def act(self, oppo_agent):
+    def act(self, oppo_agent: object):
         """
         Agent act based on the oppo_agent's information
         Parameters
@@ -59,10 +59,10 @@ class DQNAgent(AbstractAgent):
             self.State.state = self.State.state_repr(self.opponent_action, self.own_action)
         else:
             self.State.state = None
-        return int(self.select_action())
+        return int(self.__select_action())
 
-    def select_action(self):
-        # selection action based on epsilon greedy policy
+    def __select_action(self):
+        """ selection action based on epsilon greedy policy """
         a = self.Policy.sample_action(self.State.state)
 
         # epsilon decay
@@ -71,51 +71,24 @@ class DQNAgent(AbstractAgent):
         self.Policy.set_epsilon(self.play_epsilon)
         return a
 
-    def update(self, reward, own_action, opponent_action):
+    def update(self, reward: float, own_action: int, opponent_action: int):
         super(DQNAgent, self).update(reward)
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
-        self.State.oppo_memory = self.opponent_memory[:self.play_times]
+        # self.State.oppo_memory = self.opponent_memory[:self.play_times]
 
         if self.State.state is not None:
             self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
                                                           torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
             # push the transition into ReplayBuffer
             self.Memory.push(self.State.state, own_action, self.State.next_state, reward)
-            self.optimize_model()
+            self.__optimize_model()
             # Update the target network, copying all weights and biases in DQN
             if self.play_times % TARGET_UPDATE == 0:
                 self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
 
-
-    def optimize_model(self):
+    def __optimize_model(self):
         """ Train our model """
-        def compute_q_vals(Q, states, actions):
-            """
-            This method returns Q values for given state action pairs.
-
-            Args:
-                Q: Q-net  (object)
-                states: a tensor of states. Shape: batch_size x obs_dim
-                actions: a tensor of actions. Shape: Shape: batch_size x 1
-            Returns:
-                A torch tensor filled with Q values. Shape: batch_size x 1.
-            """
-            return torch.gather(Q(states), 1, actions)
-        def compute_targets(Q, rewards, next_states, discount_factor):
-            """
-            This method returns targets (values towards which Q-values should move).
-
-            Args:
-                Q: Q-net  (object)
-                rewards: a tensor of rewards. Shape: Shape: batch_size x 1
-                next_states: a tensor of states. Shape: batch_size x obs_dim
-                discount_factor: discount
-            Returns:
-                A torch tensor filled with target values. Shape: batch_size x 1.
-            """
-            return rewards + discount_factor * torch.max(Q(next_states), 1)[0].reshape((-1, 1))
-
         # don't learn without some decent experience
         if len(self.Memory.memory) < self.config.batch_size:
             return None
