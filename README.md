@@ -81,7 +81,7 @@ choices = {'uni', 'bi', 'unilabel', 'grudgerlabel', 'bi-repr'}
 'Tabular Q Learning':  <br />
 'DQN': Use all agent's previous h actions as state. Use deep neural network as Q-Network <br />
 'LSTM-QN': Use all agent's previous h actions as state. Use LSTM as Q-Network <br />
-'LSTM-QN Variant': Use all agent's previous h actions, discounted reward, playing times, defecttion ratio, etc. as state. Use LSTM and DNN ensemble network as Q-Network. <br />
+'LSTM-QN Variant': Use all agent's previous h actions, discounted reward, playing times, defection ratio, etc. as state. Use LSTM and DNN ensemble model as Q-Network. <br />
 
 [^1]: [Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning](https://arxiv.org/abs/1902.03185)
 [^2]: [DQN](https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html)
