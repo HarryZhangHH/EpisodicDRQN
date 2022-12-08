@@ -91,7 +91,7 @@ def main():
     print('press 2 to play against a strategy of your choice ')
     print('press 3 to play a N agents game')
     choice = int(input())
-    choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
+    choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-lstm-TFT','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
     rl_choices = {'7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
     strategies = {0:'ALLC',1:'ALLD',2:'TitForTat',3:'revTitForTat',4:'Random',5:'Grudger',6:'Pavlov',7:'QLearning',8:'LSTM',9:'DQN',10:'LSTMQN',11:'A2C',12:'A2CLSTM'}
 
