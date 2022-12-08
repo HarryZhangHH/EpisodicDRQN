@@ -26,6 +26,7 @@ class Environment():
         return r1, r2
 
     def optimize(self, agent1: object, agent2: object, a1: int, a2: int, r1: float, r2: float):
+        # can not be called in the multi-agent game
         agent1.update(r1, a1, a2)
         agent2.update(r2, a2, a1)
         agent1.optimize(a1, r1, agent2)

@@ -189,16 +189,31 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
     if selection_method == 'LSTM-VAR':
         agents = lstm_variant_selection(config, agents, env)
 
+    # show result
     for n in range(len(agents)):
         print('Agent{}: name:{}  final score:{}  play time:{}  times to play D:{}  ratio: {}  faced D ratio: {}'
               .format(n, agents[n].name, agents[n].running_score,
                       len(agents[n].own_memory[:agents[n].play_times]),
                       list(agents[n].own_memory[:agents[n].play_times]).count(1),
                       list(agents[n].own_memory[:agents[n].play_times]).count(1) / len(agents[n].own_memory[:agents[n].play_times]),
-                      list(agents[n].oppo_memory[:agents[n].play_times]).count(1) / len(agents[n].oppo_memory[:agents[n].play_times])))
+                      list(agents[n].opponent_memory[:agents[n].play_times]).count(1) / len(agents[n].opponent_memory[:agents[n].play_times])))
     print('The reward for total society: {}'.format(env.running_score / len(agents)))
 
+    for n in agents:
+        transitions = agents[n].SelectMemory.memory
+        _, actions, rewards, _ = zip(*transitions)
+        actions = get_index_from_action(np.array(actions, dtype=int), idx)
+        actions, rewards = np.array(actions), np.array(rewards)
+        print(f'Agent {n}:', end='')
+        values, counts = np.unique(actions, return_counts=True)
+        print(f' opponent_idx: {list(values)}, counts: {list(counts)} ', end='')
+        dict_idx = {x: rewards[np.where(actions == x)] for x in values}
+        print(f'rewards: {[np.mean(y) for _, y in dict_idx.items()]}')
 
+
+def get_index_from_action(action, idx):
+    scale = lambda x: x+1 if x>=idx else x
+    return list(map(scale, action))
 
 
 

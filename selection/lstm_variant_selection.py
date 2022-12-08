@@ -37,10 +37,10 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
 
     for n in agents:
         agent = agents[n]
-        agent.SelectionPolicyNN = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1).to(device)
-        agent.SelectionTargetNN = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1).to(device)
+        agent.SelectionPolicyNN = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1, HIDDEN_SIZE).to(device)
+        agent.SelectionTargetNN = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1, HIDDEN_SIZE).to(device)
         agent.SelectionTargetNN.load_state_dict(agent.SelectionPolicyNN.state_dict())
-        agent.SelectMemory = ReplayBuffer(1000)
+        agent.SelectMemory = ReplayBuffer(10000)
         agent.SelectOptimizer = torch.optim.Adam(agent.SelectionPolicyNN.parameters(), lr=config.learning_rate)
     
     # select using rl based on selection epsilon
@@ -90,14 +90,32 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
                 agent1, agent2 = agents[n], agents[m]
                 a1, a2 = agent1.act(agent2), agent2.act(agent1)
                 _, r1, r2 = env.step(a1, a2)
-                update_memory.push(n, m, a1, a2, r1, r2)
+                update_memory.push(n, m, a1, a2, r1, r2, agent1.State.state, agent2.State.state)
+                # if n ==0 or m == 0:
+                #     print('play')
+                #     print(f'{i}: {n} {agent1.State.state} {a1} {r1} ')
+                #     print(f'{m} {agent2.State.state} {a2} {r2} ')
+                #     input()
             
             # update based on the memory
             for me in update_memory.memory:
                 agent1, agent2 = agents[me[0]], agents[me[1]]
                 a1, a2, r1, r2 = me[2], me[3], me[4], me[5]
-                env.optimize(agent1, agent2, a1, a2, r1, r2)
+                agent1.update(r1, a1, a2)
+                agent2.update(r2, a2, a1)
                 society_reward = society_reward + r1 + r2
+
+            # optimize the model
+            for me in update_memory.memory:
+                agent1, agent2 = agents[me[0]], agents[me[1]]
+                a1, a2, r1, r2, s1, s2 = me[2], me[3], me[4], me[5], me[6], me[7]
+                agent1.optimize(a1, r1, agent2, s1)
+                agent2.optimize(a2, r2, agent1, s2)
+                # if me[0] ==0 or me[1] == 0:
+                #     print('optimize')
+                #     print(f'{i}: {me[0]} {s1} {a1} {r1} {agent1.State.next_state}')
+                #     print(f'{me[1]} {s2} {a2} {r2} {agent2.State.next_state}')
+                #     input()
             
             # process the state and next_state
             state = (h_action.numpy(), features.numpy())
@@ -130,7 +148,7 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
                     agent1.SelectionTargetNN.load_state_dict(agent1.SelectionPolicyNN.state_dict())
 
                 # epsilon decay
-                if agent1.config.select_epsilon > agent1.config.min_epsilon and agent1.play_times%5 == 0:
+                if agent1.config.select_epsilon > agent1.config.min_epsilon and agent1.play_times%7 == 0:
                     agent1.config.select_epsilon *= agent1.config.epsilon_decay
         env.update(society_reward)
     return agents
@@ -144,7 +162,7 @@ def generate_features(agent: object, max_reward: float):
     own_defect_ratio = calculate_sum(agent.own_memory)/agent.play_times
     oppo_defect_ratio = calculate_sum(agent.opponent_memory)/agent.play_times
     own_reward_ratio = own_reward/max_reward
-    play_times_ratio = min(1, agent.play_times/agent.config.n_episodes*2)
+    play_times_ratio = min(1, agent.play_times/(agent.config.n_episodes*5))
     return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_defect_ratio, play_times_ratio])
 
 def __optimize_model(agent: object, n_agents: int):

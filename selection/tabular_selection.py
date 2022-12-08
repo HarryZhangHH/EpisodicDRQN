@@ -67,7 +67,7 @@ def tabular_selection(config: object, agents: dict, env: object):
     # select using rl based on selection epsilon
     for i in tqdm(range(config.h, config.n_episodes)):
         society_reward = 0
-        memory = SelectMemory(10000)
+        update_memory = SelectMemory(10000)
 
         # select opponent and play
         for n in range(n_agents):
@@ -92,18 +92,25 @@ def tabular_selection(config: object, agents: dict, env: object):
             # play
             agent1, agent2 = agents[n], agents[m]
             a1, a2 = agent1.act(agent2), agent2.act(agent1)
-            episode, r1, r2 = env.step(a1, a2)
+            _, r1, r2 = env.step(a1, a2)
             # store the data into the select buffer and update all the Q_table after all agents play
             # Agent = namedtuple('Agent', ['state', 'action', 'agent_1', 'agent_2', 'action_1', 'action_2', 'reward_1', 'reward_2'])
-            memory.push(state, action_encode, n, m, a1, a2, r1, r2)
+            update_memory.push(state, action_encode, n, m, a1, a2, r1, r2, agent1.State.state, agent2.State.state)
 
         # update the Q table
-        for me in memory.memory:
+        for me in update_memory.memory:
             agent1, agent2 = agents[me[2]], agents[me[3]]
             a1, a2, r1, r2 = me[4], me[5], me[6], me[7]
             agent1.update(r1, a1, a2)
             agent2.update(r2, a2, a1)
             society_reward = society_reward + r1 + r2
+        
+        # optimize the model
+        for me in update_memory.memory:
+            agent1, agent2 = agents[me[0]], agents[me[1]]
+            a1, a2, r1, r2, s1, s2 = me[2], me[3], me[4], me[5], me[6], me[7]
+            agent1.optimize(a1, r1, agent2, s1)
+            agent2.optimize(a2, r2, agent1, s2)
 
         # get history action from agents' memory
         action_hist = torch.zeros((n_agents, h))
@@ -112,7 +119,7 @@ def tabular_selection(config: object, agents: dict, env: object):
             action_hist[n, :] = torch.as_tensor(agents[n].own_memory[t - h:t])
         action_hist = label_encode(action_hist.T)
 
-        for me in memory.memory:
+        for me in update_memory.memory:
             state, action, reward, agent_idx = me[0], me[1], me[6], me[3]
             next_state = action_hist[torch.arange(0, action_hist.shape[0]) != agent_idx, ...]
             Q_table[state, action] = (1 - config.alpha) * Q_table[state, action] \

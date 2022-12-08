@@ -84,7 +84,7 @@ def dqn_selection(config: object, agents: dict, env: object, rnn: bool = False):
                 agent1, agent2 = agents[n], agents[m]
                 a1, a2 = agent1.act(agent2), agent2.act(agent1)
                 _, r1, r2 = env.step(a1, a2)
-                update_memory.push(n, m, a1, a2, r1, r2)
+                update_memory.push(n, m, a1, a2, r1, r2, agent1.State.state, agent2.State.state)
 
             # update based on the memory
             for me in update_memory.memory:
@@ -93,6 +93,13 @@ def dqn_selection(config: object, agents: dict, env: object, rnn: bool = False):
                 agent1.update(r1, a1, a2)
                 agent2.update(r2, a2, a1)
                 society_reward = society_reward + r1 + r2
+
+             # optimize the model
+            for me in update_memory.memory:
+                agent1, agent2 = agents[me[0]], agents[me[1]]
+                a1, a2, r1, r2, s1, s2 = me[2], me[3], me[4], me[5], me[6], me[7]
+                agent1.optimize(a1, r1, agent2, s1)
+                agent2.optimize(a2, r2, agent1, s2)
 
             # process the next_state
             next_state = []

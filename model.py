@@ -49,15 +49,15 @@ class LSTM(nn.Module):
         return out
 
 class LSTMVariant(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, num_layers: int, feature_size: int, output_size: int):
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int, feature_size: int, output_size: int, hidden_size_f: int):
         super(LSTMVariant, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc1 = nn.Linear(feature_size, hidden_size)
-        self.fc1_bn = nn.BatchNorm1d(hidden_size*2)
-        self.fc2 = nn.Linear(hidden_size*2, hidden_size)
+        self.fc1 = nn.Linear(feature_size, hidden_size_f)
+        self.fc1_bn = nn.BatchNorm1d(hidden_size+hidden_size_f)
+        self.fc2 = nn.Linear(hidden_size+hidden_size_f, hidden_size)
         self.fc2_bn = nn.BatchNorm1d(hidden_size)
         self.dropout1 = nn.Dropout(0.25)
         self.fc3 = nn.Linear(hidden_size, output_size)
