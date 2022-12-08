@@ -6,6 +6,7 @@ from utils import *
 MAD_THRESHOLD = 5
 TARGET_UPDATE = 10
 HIDDEN_SIZE = 128
+BUFFER_SIZE = 1000
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class DQNAgent(AbstractAgent):
@@ -26,7 +27,7 @@ class DQNAgent(AbstractAgent):
         self.State = self.StateRepr(method=config.state_repr)
         self.build()
         self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
-        self.Memory = self.ReplayBuffer(1000)  # an object
+        self.Memory = self.ReplayBuffer(BUFFER_SIZE)  # an object
         self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
         self.loss = []
 

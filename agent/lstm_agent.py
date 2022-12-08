@@ -9,6 +9,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 TARGET_UPDATE = 100
 HIDDEN_SIZE = 128
 FEATURE_SIZE = 8
+BUFFER_SIZE = 1000
 NUM_LAYER = 1
 
 class LSTMAgent(AbstractAgent):
@@ -29,7 +30,7 @@ class LSTMAgent(AbstractAgent):
         self.State = self.StateRepr(method=config.state_repr)
         self.build() if 'repr' not in config.state_repr else self.build2()
         self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
-        self.Memory = self.ReplayBuffer(1000)  # an object
+        self.Memory = self.ReplayBuffer(BUFFER_SIZE)  # an object
         self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
         self.loss = []
 

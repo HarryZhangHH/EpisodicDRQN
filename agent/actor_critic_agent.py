@@ -7,6 +7,7 @@ from utils import *
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 HIDDEN_SIZE = 128
+BUFFER_SIZE = 1000
 TARGET_UPDATE = 10
 ENTROPY_COEF = 0.01
 CRITIC_COEF = 0.5
@@ -37,7 +38,7 @@ class ActorCriticAgent(AbstractAgent):
 
         if 'Worker' not in self.name:
             print(self.PolicyNet.eval())
-            self.Memory = self.ReplayBuffer(100)  # an object
+            self.Memory = self.ReplayBuffer(BUFFER_SIZE)  # an object
             self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
             self.Workers = Worker(self.config)
 
