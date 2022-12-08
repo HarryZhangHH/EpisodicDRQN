@@ -52,13 +52,13 @@ class ActorCriticLSTMAgent(AbstractAgent):
         action index
         """
         # get opponent's last h move
-        self.opponent_action = torch.as_tensor(
+        opponent_h_actions = torch.as_tensor(
             oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
-        self.own_action = torch.as_tensor(
+        own_h_actions = torch.as_tensor(
             self.own_memory[self.play_times - self.config.h: self.play_times])
 
         if self.play_times >= self.config.h and oppo_agent.play_times >= self.config.h:
-            self.State.state = self.State.state_repr(self.opponent_action, self.own_action)
+            self.State.state = self.State.state_repr(opponent_h_actions, own_h_actions)
         else:
             self.State.state = None
         return int(self.__select_action())
@@ -70,15 +70,19 @@ class ActorCriticLSTMAgent(AbstractAgent):
         # self.PolicyNet.evaluate_action(self.State.state[None], torch.tensor(a)) if self.State.state is not None else None
         return a
 
-    def update(self, reward: float, own_action: int, opponent_action: int):
+    def update(self, reward: float, own_action: int, opponent_action: int, oppo_agent: object):
         super(ActorCriticLSTMAgent, self).update(reward)
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
-        self.State.oppo_memory = self.opponent_memory[:self.play_times]
+        # self.State.oppo_memory = self.opponent_memory[:self.play_times]
 
         if self.State.state is not None:
-            self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
-                                                          torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
+            opponent_h_actions = torch.as_tensor(
+                oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
+            own_h_actions = torch.as_tensor(
+                self.own_memory[self.play_times - self.config.h: self.play_times])
+
+            self.State.next_state = self.State.state_repr(opponent_h_actions, own_h_actions)
             self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
             if 'Worker' not in self.name:
                 # push the transition into ReplayBuffer

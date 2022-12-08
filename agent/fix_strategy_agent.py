@@ -11,6 +11,7 @@ class StrategyAgent(AbstractAgent):
         super(StrategyAgent, self).__init__(config)
         self.own_memory = []
         self.opponent_memory = []
+        self.State.state = None
         
     def roll(self):
         return random.randint(0,1)

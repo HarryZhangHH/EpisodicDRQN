@@ -27,7 +27,7 @@ class AbstractAgent():
         self.play_times += 1
     __update = update
 
-    def optimize(self, action: int, reward: float, oppo_agent: object):
+    def optimize(self, action: int, reward: float, oppo_agent: object, state=None):
         pass
     __optimize = optimize
 
@@ -154,8 +154,6 @@ class AbstractAgent():
         def push(self, *args):
             """Save a transition"""
             self.memory.append(Transition(*args))
-            if len(self.memory) > self.capacity:
-                self.memory = self.memory[1:]
         def clean(self):
             self.memory = deque([],maxlen=self.capacity)
         def sample(self, batch_size):

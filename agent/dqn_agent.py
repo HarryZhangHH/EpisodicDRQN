@@ -20,8 +20,8 @@ class DQNAgent(AbstractAgent):
         """
         super(DQNAgent, self).__init__(config)
         self.name = name
-        self.own_memory = torch.zeros((config.n_episodes*1000, ))
-        self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
+        self.own_memory = torch.zeros((config.n_episodes*10000, ))
+        self.opponent_memory = torch.zeros((config.n_episodes*10000, ))
         self.play_epsilon = config.play_epsilon
         self.State = self.StateRepr(method=config.state_repr)
         self.build()
@@ -51,12 +51,12 @@ class DQNAgent(AbstractAgent):
         action index
         """
         # get opponent's last h move
-        self.opponent_action = torch.as_tensor(
+        opponent_h_actions = torch.as_tensor(
             oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
-        self.own_action = torch.as_tensor(
+        own_h_actions = torch.as_tensor(
             self.own_memory[self.play_times - self.config.h: self.play_times])
         if self.play_times >= self.config.h and oppo_agent.play_times >= self.config.h:
-            self.State.state = self.State.state_repr(self.opponent_action, self.own_action)
+            self.State.state = self.State.state_repr(opponent_h_actions, own_h_actions)
         else:
             self.State.state = None
         return int(self.__select_action())
@@ -77,15 +77,25 @@ class DQNAgent(AbstractAgent):
         self.opponent_memory[self.play_times - 1] = opponent_action
         # self.State.oppo_memory = self.opponent_memory[:self.play_times]
 
-        if self.State.state is not None:
-            self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
-                                                          torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
-            # push the transition into ReplayBuffer
-            self.Memory.push(self.State.state, own_action, self.State.next_state, reward)
-            self.__optimize_model()
-            # Update the target network, copying all weights and biases in DQN
-            if self.play_times % TARGET_UPDATE == 0:
-                self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
+    def optimize(self, action: int, reward: float, oppo_agent: object, state=None):
+        super(DQNAgent, self).optimize(action, reward, oppo_agent)
+        if self.State.state is None:
+            return None
+
+        # get next state
+        opponent_h_actions = torch.as_tensor(
+            oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
+        own_h_actions = torch.as_tensor(
+            self.own_memory[self.play_times - self.config.h: self.play_times])
+        self.State.next_state = self.State.state_repr(opponent_h_actions, own_h_actions)
+        self.State.state = self.State.state if state is None else state
+
+        # push the transition into ReplayBuffer
+        self.Memory.push(self.State.state, action, self.State.next_state, reward)
+        self.__optimize_model()
+        # Update the target network, copying all weights and biases in DQN
+        if self.play_times % TARGET_UPDATE == 0:
+            self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
 
     def __optimize_model(self):
         """ Train our model """

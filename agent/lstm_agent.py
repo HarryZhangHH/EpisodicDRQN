@@ -6,7 +6,7 @@ import sys
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-TARGET_UPDATE = 10
+TARGET_UPDATE = 100
 HIDDEN_SIZE = 128
 FEATURE_SIZE = 8
 NUM_LAYER = 1
@@ -45,8 +45,8 @@ class LSTMAgent(AbstractAgent):
     def build2(self):
         """ Build a variant LSTM network, an ensemble LSTM and DENSE Network """
         input_size = 2 if 'bi' in self.config.state_repr else 1
-        self.PolicyNet = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE, self.config.n_actions).to(device)
-        self.TargetNet = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE, self.config.n_actions).to(device)
+        self.PolicyNet = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE, self.config.n_actions, int(HIDDEN_SIZE/2)).to(device)
+        self.TargetNet = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE, self.config.n_actions, int(HIDDEN_SIZE/2)).to(device)
         self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
         print(self.TargetNet.eval())
 
@@ -63,13 +63,13 @@ class LSTMAgent(AbstractAgent):
         action index: int
         """
         # get opponent's last h move
-        self.opponent_action = torch.as_tensor(
+        opponent_h_actions = torch.as_tensor(
             oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
-        self.own_action = torch.as_tensor(
+        own_h_actions = torch.as_tensor(
             self.own_memory[self.play_times - self.config.h: self.play_times])
         
         if self.play_times >= self.config.h and oppo_agent.play_times >= self.config.h:
-            self.State.state = self.State.state_repr(self.opponent_action, self.own_action)
+            self.State.state = self.State.state_repr(opponent_h_actions, own_h_actions)
             self.State.state = torch.permute(self.State.state.view(-1, self.config.h), (1, 0)) # important
 
             if 'repr' in self.config.state_repr:
@@ -103,12 +103,13 @@ class LSTMAgent(AbstractAgent):
         oppo_faced_defect_ratio = calculate_sum(oppo_agent.opponent_memory)/oppo_agent.play_times
         own_reward_ratio = own_reward/max_reward
         oppo_reward_ratio = oppo_reward/max_reward
-        own_play_times_ratio = min(1, self.play_times/self.config.n_episodes)
-        oppo_play_times_ratio = min(1, oppo_agent.play_times/self.config.n_episodes)
+        own_play_times_ratio = min(1, self.play_times/(self.config.n_episodes*5))
+        oppo_play_times_ratio = min(1, oppo_agent.play_times/(self.config.n_episodes*5))
         if FEATURE_SIZE == 4:
-            return torch.FloatTensor([own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio])
+            return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_reward_ratio, oppo_defect_ratio])
         else:
-            return torch.FloatTensor([own_reward_ratio, oppo_reward_ratio, own_defect_ratio, oppo_defect_ratio, own_faced_defect_ratio, oppo_faced_defect_ratio, own_play_times_ratio, oppo_play_times_ratio])
+            return torch.FloatTensor([own_reward_ratio, own_defect_ratio, own_faced_defect_ratio, own_play_times_ratio,
+                                      oppo_reward_ratio, oppo_defect_ratio, oppo_faced_defect_ratio, oppo_play_times_ratio])
 
     def update(self, reward: float, own_action: int, opponent_action: int):
         super(LSTMAgent, self).update(reward)
@@ -116,28 +117,30 @@ class LSTMAgent(AbstractAgent):
         self.opponent_memory[self.play_times - 1] = opponent_action
         # self.State.oppo_memory = self.opponent_memory[:self.play_times]
 
-        if self.State.state is not None:
-            self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]),
-                                                          torch.cat([self.own_action[1:], torch.as_tensor([own_action])]))
-            self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
-        
-    def optimize(self, action: int, reward: float, oppo_agent: object):
+    def optimize(self, action: int, reward: float, oppo_agent: object, state=None):
         """ push the trajectoriy into the ReplayBuffer and optimize the model """
         super(LSTMAgent, self).optimize(action, reward, oppo_agent)
         if self.State.state is None:
             return None
 
+        # get opponent's last h move
+        opponent_h_actions = torch.as_tensor(
+            oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
+        own_h_actions = torch.as_tensor(
+            self.own_memory[self.play_times - self.config.h: self.play_times])
+        self.State.next_state = self.State.state_repr(opponent_h_actions, own_h_actions)
+        self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
         if 'repr' in self.config.state_repr:
             feature = self.generate_feature(oppo_agent)
             self.State.next_state = (self.State.next_state.numpy(), feature.numpy())
-            self.State.state = (self.State.state[0].numpy(), self.State.state[1].numpy()) if type(self.State.state[0]) is not np.ndarray else self.State.state
+            self.State.state = (self.State.state[0].numpy(), self.State.state[1].numpy()) if state is None else (state[0].numpy(), state[1].numpy())
 
         # push the transition into ReplayBuffer
         if self.name == 'LSTM':
             self.Memory.push(self.State.state, action, int(oppo_agent.own_memory[oppo_agent.play_times - 1]), reward)
         if self.name == 'LSTMQN':
             self.Memory.push(self.State.state, action, self.State.next_state, reward)
-
+        
         # print(f'Episode {self.play_times}:  {own_action}, {opponent_action}') if self.play_times > self.config.batch_size else None
         self.__optimize_model()
         # Update the target network, copying all weights and biases in DQN

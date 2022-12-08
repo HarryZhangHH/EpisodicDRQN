@@ -49,13 +49,13 @@ class TabularAgent(AbstractAgent):
         action index
         """
         # get opponent's last h move
-        self.opponent_action = torch.as_tensor(
+        opponent_h_actions = torch.as_tensor(
             oppo_agent.own_memory[oppo_agent.play_times - self.h: oppo_agent.play_times])
-        self.own_action = torch.as_tensor(
+        own_h_actions = torch.as_tensor(
             self.own_memory[self.play_times - self.config.h: self.play_times])
         # label encode
         if self.play_times >= self.h:
-            self.State.state = self.State.state_repr(self.opponent_action)
+            self.State.state = self.State.state_repr(opponent_h_actions)
         return int(self.__select_action())
 
     def __select_action(self):
@@ -73,15 +73,26 @@ class TabularAgent(AbstractAgent):
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
         self.State.oppo_memory = self.opponent_memory[:self.play_times]
+        
+    def optimize(self, action: int, reward: float, oppo_agent: object, state=None):
+        super(TabularAgent, self).optimize(action, reward, oppo_agent)
+        if self.State.state is None:
+            return None
+        
+        opponent_h_actions = torch.as_tensor(
+            oppo_agent.own_memory[oppo_agent.play_times - self.h: oppo_agent.play_times])
+        own_h_actions = torch.as_tensor(
+            self.own_memory[self.play_times - self.config.h: self.play_times])
+        # label encode
+        self.State.next_state = self.State.state_repr(opponent_h_actions)
+        self.State.state = self.State.state if state is None else state
 
-        if self.State.state is not None:
-            self.State.next_state = self.State.state_repr(torch.cat([self.opponent_action[1:], torch.as_tensor([opponent_action])]))
-            # push the transition into ReplayBuffer
-            self.Memory.push(self.State.state, own_action, self.State.next_state, reward)
-            if self.name == 'QLearning':
-                # Q learning update
-                self.Q_table[self.State.state, own_action] = self.Q_table[self.State.state, own_action] + self.config.alpha * \
-                                                       (reward + self.config.discount * (torch.max(self.Q_table[self.State.next_state])) - self.Q_table[self.State.state, own_action])
+        # push the transition into ReplayBuffer
+        self.Memory.push(self.State.state, action, self.State.next_state, reward)
+        if self.name == 'QLearning':
+            # Q learning update
+            self.Q_table[self.State.state, action] = self.Q_table[self.State.state, action] + self.config.alpha * \
+                                                       (reward + self.config.discount * (torch.max(self.Q_table[self.State.next_state])) - self.Q_table[self.State.state, action])
 
     def mc_update(self):
         """ MC update, first-visit, on-policy """
