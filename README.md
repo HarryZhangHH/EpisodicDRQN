@@ -47,14 +47,14 @@ Choice **3** is to run the multi-agents game.
 ## PLAY
 ### The selectable methods: 
 ```
-choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
+choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-lstm-TFT','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
 rl_choices = {'7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
 ```
 The first 7 methods are the fix-strategy methods.
 
 7-qLearning is the tabular q learning method, you can change the `--h=` and `--state_repr=` in command line arguments to determine the tabular size. Note that using tabular method, the maximize of h is 3 and you can only use the label based state representation.
 
-8-lstm-pavlov is a LSTM[^3] method using the LSTM network to predict the next action of your opponent, you can change the `--h=` to determine the sequence length. Note that you can not use the label based state representation in the lstm based method. I personally recommend `--state_repr=bi`.
+8-lstm-TFT is a LSTM[^3] method using the LSTM network to predict the next action of your opponent, you can change the `--h=` to determine the sequence length. Note that you can not use the label based state representation in the lstm based method. I personally recommend `--state_repr=bi`.
 
 9-dqn is a DQN[^2] method to predict the Q value.
 
