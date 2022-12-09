@@ -34,7 +34,7 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
     """
     n_agents = len(agents)
     max_reward = config.temptation/(1-config.discount)  # sum of geometric progression 
-
+    
     for n in agents:
         agent = agents[n]
         agent.SelectionPolicyNN = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1, HIDDEN_SIZE).to(device)
