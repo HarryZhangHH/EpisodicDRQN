@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from agent import *
 from selection import *
-from utils import label_encode, argmax, iterate_combination, question, seed_everything
+from utils import label_encode, argmax, iterate_combination, question, seed_everything, HiddenPrints
 from env import Environment
 import sys
 
