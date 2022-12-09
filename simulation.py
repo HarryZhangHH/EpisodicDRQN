@@ -151,22 +151,23 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
     env = Environment(config)
     agents = {}
     index = 0
-    for idx, n in enumerate(lst):
-        for _ in range(n):
-            if idx == 0:
-                agents[index] = constructAgent(strategies[random.randint(0, 6)], config)  # Fix strategy
-                # agents[index] = constructAgent('TitForTat', config)
-            if idx == 1:
-                agents[index] = constructAgent('QLearning', config)
-            if idx == 2:
-                agents[index] = constructAgent('DQN', config)
-            if idx == 3:
-                agents[index] = constructAgent('LSTM', config)
-            if idx == 4:
-                agents[index] = constructAgent('LSTMQN', config)
-            print(f'initialize Agent {index}', end=' ')
-            print(agents[index].name)
-            index += 1
+    with HiddenPrints():
+        for idx, n in enumerate(lst):
+            for _ in range(n):
+                if idx == 0:
+                    agents[index] = constructAgent(strategies[random.randint(0, 6)], config)  # Fix strategy
+                    # agents[index] = constructAgent('TitForTat', config)
+                if idx == 1:
+                    agents[index] = constructAgent('QLearning', config)
+                if idx == 2:
+                    agents[index] = constructAgent('DQN', config)
+                if idx == 3:
+                    agents[index] = constructAgent('LSTM', config)
+                if idx == 4:
+                    agents[index] = constructAgent('LSTMQN', config)
+                print(f'initialize Agent {index}', end=' ')
+                print(agents[index].name)
+                index += 1
 
     # names = locals()
     # for n in range(n_agents):
