@@ -34,7 +34,7 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
     """
     n_agents = len(agents)
     max_reward = config.temptation/(1-config.discount)  # sum of geometric progression 
-    
+
     for n in agents:
         agent = agents[n]
         agent.SelectionPolicyNN = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1, HIDDEN_SIZE).to(device)
@@ -152,18 +152,6 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
                     agent1.config.select_epsilon *= agent1.config.epsilon_decay
         env.update(society_reward)
     return agents
-
-def generate_features(agent: object, max_reward: float):
-    """ 
-    Generate extra features 
-    own_reward_ratio \in (0,1], own_defect_ratio \in (0,1], oppo_defect_ratio \in [0,1] , play_times_ratio \in [0,1]
-    """
-    own_reward = agent.running_score
-    own_defect_ratio = calculate_sum(agent.own_memory)/agent.play_times
-    oppo_defect_ratio = calculate_sum(agent.opponent_memory)/agent.play_times
-    own_reward_ratio = own_reward/max_reward
-    play_times_ratio = min(1, agent.play_times/(agent.config.n_episodes*5))
-    return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_defect_ratio, play_times_ratio])
 
 def __optimize_model(agent: object, n_agents: int):
     """ Train and optimize our model """

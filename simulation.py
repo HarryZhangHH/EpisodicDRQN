@@ -190,6 +190,8 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
     if selection_method == 'LSTM-VAR':
         agents = lstm_variant_selection(config, agents, env)
 
+    if selection_method == 'A2C':
+        agents = a2c_selection(config, agents, env)
     # show result
     for n in range(len(agents)):
         print('Agent{}: name:{}  final score:{}  play time:{}  times to play D:{}  ratio: {}  faced D ratio: {}'
