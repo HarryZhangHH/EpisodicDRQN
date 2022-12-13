@@ -71,28 +71,32 @@ class ActorCriticLSTMAgent(AbstractAgent):
         # self.PolicyNet.evaluate_action(self.State.state[None], torch.tensor(a)) if self.State.state is not None else None
         return a
 
-    def update(self, reward: float, own_action: int, opponent_action: int, oppo_agent: object):
+    def update(self, reward: float, own_action: int, opponent_action: int):
         super(ActorCriticLSTMAgent, self).update(reward)
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
         # self.State.oppo_memory = self.opponent_memory[:self.play_times]
 
-        if self.State.state is not None:
-            opponent_h_actions = torch.as_tensor(
-                oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
-            own_h_actions = torch.as_tensor(
-                self.own_memory[self.play_times - self.config.h: self.play_times])
+    def optimize(self, action: int, reward: float, oppo_agent: object, state=None):
+        super(ActorCriticLSTMAgent, self).optimize(action, reward, oppo_agent)
+        if self.State.state is None:
+            return None
 
-            self.State.next_state = self.State.state_repr(opponent_h_actions, own_h_actions)
-            self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
-            if 'Worker' not in self.name:
-                # push the transition into ReplayBuffer
-                self.Memory.push(self.State.state, own_action, self.State.next_state, reward)
-                # We need to make our task into the episodic task
-                # don't learn without some decent experience
-                if not len(self.Memory.memory) < self.config.batch_size:
-                    self.Workers.set_batch(self.PolicyNet, self.Memory)
-                    self.optimize_model()
+        opponent_h_actions = torch.as_tensor(
+            oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
+        own_h_actions = torch.as_tensor(
+            self.own_memory[self.play_times - self.config.h: self.play_times])
+
+        self.State.next_state = self.State.state_repr(opponent_h_actions, own_h_actions)
+        self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
+        if 'Worker' not in self.name:
+            # push the transition into ReplayBuffer
+            self.Memory.push(self.State.state, action, self.State.next_state, reward)
+            # We need to make our task into the episodic task
+            # don't learn without some decent experience
+            if not len(self.Memory.memory) < self.config.batch_size:
+                self.Workers.set_batch(self.PolicyNet, self.Memory)
+                self.optimize_model()
 
     def optimize_model(self):
         """ Train our model """
