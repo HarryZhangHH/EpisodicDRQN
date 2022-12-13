@@ -112,3 +112,15 @@ def compute_targets(Q, rewards, next_states, discount_factor):
         A torch tensor filled with target values. Shape: batch_size x 1.
     """
     return rewards + discount_factor * torch.max(Q(next_states), 1)[0].view(-1, 1)
+
+def generate_features(agent: object, max_reward: float, max_play_times: float):
+    """
+    Generate extra features
+    own_reward_ratio \in (0,1], own_defect_ratio \in (0,1], oppo_defect_ratio \in [0,1] , play_times_ratio \in [0,1]
+    """
+    own_reward = agent.running_score
+    own_defect_ratio = calculate_sum(agent.own_memory)/agent.play_times
+    oppo_defect_ratio = calculate_sum(agent.opponent_memory)/agent.play_times
+    own_reward_ratio = own_reward/max_reward
+    play_times_ratio = min(1, agent.play_times/max_play_times)
+    return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_defect_ratio, play_times_ratio])

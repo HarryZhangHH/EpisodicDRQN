@@ -121,7 +121,7 @@ def twoSimulate(strategies, num, config, delta = 0.0001):
 ########################################################################################################################
 
 # multi-agent PD benchmark
-MULTI_SELECTION_METHOD = 'LSTM-VAR'
+MULTI_SELECTION_METHOD = 'A2C'
 def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METHOD):
     """
     Multi-agent simulation
@@ -192,6 +192,7 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
 
     if selection_method == 'A2C':
         agents = a2c_selection(config, agents, env)
+
     # show result
     for n in range(len(agents)):
         print('Agent{}: name:{}  final score:{}  play time:{}  times to play D:{}  ratio: {}  faced D ratio: {}'
@@ -203,7 +204,7 @@ def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METH
     print('The reward for total society: {}'.format(env.running_score / len(agents)))
 
     for n in agents:
-        transitions = agents[n].SelectMemory.memory
+        transitions = agents[n].SelectionMemory.memory
         _, actions, rewards, _ = zip(*transitions)
         actions = get_index_from_action(np.array(actions, dtype=int), idx)
         actions, rewards = np.array(actions), np.array(rewards)
