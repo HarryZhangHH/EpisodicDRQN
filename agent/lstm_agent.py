@@ -118,7 +118,7 @@ class LSTMAgent(AbstractAgent):
         self.opponent_memory[self.play_times - 1] = opponent_action
         # self.State.oppo_memory = self.opponent_memory[:self.play_times]
 
-    def optimize(self, action: int, reward: float, oppo_agent: object, state=None):
+    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None):
         """ push the trajectoriy into the ReplayBuffer and optimize the model """
         super(LSTMAgent, self).optimize(action, reward, oppo_agent)
         if self.State.state is None:

@@ -8,7 +8,7 @@ from utils import label_encode, argmax, iterate_combination, question, seed_ever
 from env import Environment
 import sys
 
-def constructAgent(name, config):
+def constructAgent(name: str, config: object):
     if name == 'A2CLSTM':
         assert 'label' not in config.state_repr, 'you cannot use the label-based state representation method, lstm need the sequential data'
         return ActorCriticLSTMAgent(name, config)
@@ -28,7 +28,7 @@ def constructAgent(name, config):
 #################################################### TWO-AGENT GAME ####################################################
 ########################################################################################################################
 
-def benchmark(strategies, num, config):
+def benchmark(strategies: dict, num: int, config: object):
     # This benchmark is generated in the geometric setting using the first-visit Monte Carlo method
     # config.n_episode is used as n rounds
     discount = config.discount
@@ -72,7 +72,7 @@ def benchmark(strategies, num, config):
         Q_table_list.append(agent1.Q_table)
     return Q_table_list
 
-def twoSimulate(strategies, num, config, delta = 0.0001):
+def twoSimulate(strategies: dict, num: int, config: object, delta: float = 0.0001):
     converge = False
     seed_everything()
     if 'Learning' in strategies[num]:
@@ -122,7 +122,7 @@ def twoSimulate(strategies, num, config, delta = 0.0001):
 
 # multi-agent PD benchmark
 MULTI_SELECTION_METHOD = 'A2C'
-def multiAgentSimulate(strategies, config, selection_method=MULTI_SELECTION_METHOD):
+def multiAgentSimulate(strategies: dict, config: object, selection_method: str = MULTI_SELECTION_METHOD):
     """
     Multi-agent simulation
     Parameters

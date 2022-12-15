@@ -1,6 +1,6 @@
 import random
 import torch
-from utils import argmax, label_encode
+from utils import argmax, label_encode, Type
 from collections import namedtuple, deque
 import numpy as np
 Transition = namedtuple('Transition', ['state','action','next_state','reward'])
@@ -27,7 +27,7 @@ class AbstractAgent():
         self.play_times += 1
     __update = update
 
-    def optimize(self, action: int, reward: float, oppo_agent: object, state=None):
+    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None):
         pass
     __optimize = optimize
 
@@ -36,23 +36,23 @@ class AbstractAgent():
         self.play_times = 0
     __reset = reset
 
-    """
-    Process the results of a round. This provides an opportunity to store data 
-    that preserves the memory of previous rounds.
-
-    Parameters
-    ----------
-    my_strategy: bool
-    other_strategy: bool
-    """
     def process_results(self, my_strategy, other_strategy):
+        """
+        Process the results of a round. This provides an opportunity to store data
+        that preserves the memory of previous rounds.
+
+        Parameters
+        ----------
+        my_strategy: bool
+        other_strategy: bool
+        """
         pass
 
     class EpsilonPolicy(object):
         """
         A simple epsilon greedy policy.
         """
-        def __init__(self, Q, epsilon, n_actions):
+        def __init__(self, Q, epsilon: float, n_actions: int):
             """
             Parameters
             ----------
@@ -61,7 +61,7 @@ class AbstractAgent():
             self.Q = Q
             self.epsilon = epsilon
             self.n_actions = n_actions
-        def sample_action(self, obs):
+        def sample_action(self, obs: Type.TensorType):
             """
             This method takes a state as input and returns an action sampled from this policy.
             ----------
@@ -100,7 +100,7 @@ class AbstractAgent():
             method: to select the feature construction method, choices=[None, 'grudger'] (string)
             mad_threshold: the threshold comparing the number of opponent's defection to decide when the agent will become mad (int)
         """
-        def __init__(self, method=None, mad_threshold=1):
+        def __init__(self, method: str = None, mad_threshold: int = 1):
             self.state = None
             self.next_state = None
             self.method = method
@@ -108,7 +108,7 @@ class AbstractAgent():
             self.mad = False
             self.oppo_memory = torch.zeros((1,))
 
-        def state_repr(self, oppo_action, own_action=None):
+        def state_repr(self, oppo_action: Type.TensorType, own_action: Type.TensorType = None):
             """
             This method takes the opponent action and your own action as input and return an encoded state
 
@@ -148,7 +148,7 @@ class AbstractAgent():
         Args:
             capacity: the capacit of replay buffer (int)
         """
-        def __init__(self, capacity):
+        def __init__(self, capacity: int):
             self.capacity = capacity
             self.memory = deque([],maxlen=capacity)
         def push(self, *args):
@@ -156,7 +156,7 @@ class AbstractAgent():
             self.memory.append(Transition(*args))
         def clean(self):
             self.memory = deque([],maxlen=self.capacity)
-        def sample(self, batch_size):
+        def sample(self, batch_size: int):
             return random.sample(self.memory, batch_size)
         def __len__(self):
             return len(self.memory)

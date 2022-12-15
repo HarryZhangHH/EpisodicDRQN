@@ -3,8 +3,17 @@ import torch
 import numpy as np
 import os, sys
 import random
+from typing import Union
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+class Type:
+    # Represents a generic tensor type.
+    # This could be an np.ndarray, tf.Tensor, or a torch.Tensor.
+    TensorType = Union[np.array, "tf.Tensor", "torch.Tensor"]
+
+    # Either a plain tensor, or a dict or tuple of tensors (or StructTensors).
+    TensorStructType = Union[TensorType, dict, tuple]
 
 class HiddenPrints:
     """

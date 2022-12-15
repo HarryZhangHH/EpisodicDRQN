@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from utils import Type
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -104,19 +105,19 @@ class A2CNetwork(nn.Module):
             nn.Softmax(dim=-1)
         )
 
-    def forward(self, x):
+    def forward(self, x: Type.TensorType):
         x = x.type(torch.FloatTensor).to(device)
         x = x.view(-1, self.input_size)
         value = self.critic(x)
         action_prob = self.actor(x)
         return value, action_prob
 
-    def get_critic(self, x):
+    def get_critic(self, x: Type.TensorType):
         x = x.type(torch.FloatTensor).to(device)
         x = x.view(-1, self.input_size)
         return self.critic(x)
 
-    def evaluate_action(self, state, action):
+    def evaluate_action(self, state: Type.TensorType, action: Type.TensorType):
         """
         Returns
         -------
@@ -148,7 +149,7 @@ class A2CLSTM(nn.Module):
         self.critic_layer = nn.Linear(hidden_size, 1)
         self.actor_layer = nn.Linear(hidden_size, output_size)
 
-    def forward(self, x):
+    def forward(self, x: Type.TensorType):
         # Set initial hidden and cell states
         # x need to be: (batch_size, seq_length, input_size)   seq_length=config.h
         x = x.type(torch.FloatTensor).to(device)
@@ -204,7 +205,7 @@ class FeatureNet(nn.Module):
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(feature_size, hidden_size)
         # self.fc_bn = nn.BatchNorm1d(hidden_size * 2)
-    def forward(self, x):
+    def forward(self, x: Type.TensorStructType):
         x1, x2 = x[0], x[1]
         x1 = x1.type(torch.FloatTensor).to(device)
         x1 = x1.view(x1.size(0), -1, self.input_size)
@@ -224,6 +225,7 @@ class CriticNet(nn.Module):
     def __init__(self, input_size: int, hidden_size: int, seed: int = 42):
         super(CriticNet, self).__init__()
         torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
         self.input_size = input_size
         # critic net
         self.critic = torch.nn.Sequential(
@@ -231,7 +233,12 @@ class CriticNet(nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(hidden_size, 1)
         )
-    def forward(self, x):
+    def forward(self, x: Type.TensorType):
+        """
+        Returns
+        -------
+        value: (float tensor) the expected value of state
+        """
         x = x.type(torch.FloatTensor).to(device)
         x = x.view(-1, self.input_size)
         value = self.critic(x)
@@ -248,27 +255,38 @@ class ActorNet(nn.Module):
             nn.Linear(hidden_size, output_size),
             torch.nn.Softmax(dim=-1)
         )
-    def forward(self, x):
+    def forward(self, x: Type.TensorType):
         x = x.type(torch.FloatTensor).to(device)
         x = x.view(-1, self.input_size)
         action_prob = self.actor(x)
         return action_prob
 
-    def evaluate_action(self, state, action):
+    def evaluate_action(self, state: Type.TensorType, action: Type.TensorType):
         """
         Returns
         -------
-        value: (float tensor) the expected value of state
+
         log_probs: (float tensor) the log probability of taking the action in the state
         entropy: (float tensor) the entropy of each state's action distribution
         """
-        state = state.type(torch.FloatTensor).to(device)
-        state = state.view(-1, self.input_size)
-        action_prob = self.actor(state)
+        action_prob = self.forward(state)
         m = torch.distributions.Categorical(action_prob)
         log_probs = m.log_prob(action).view(-1, 1)
         entropy = m.entropy().mean()
         return log_probs, entropy
+
+    def act(self, state: Type.TensorType):
+        """
+        Returns
+        -------
+        action: (int) the sampled action
+        entropy: (float tensor) the entropy of each state's action distribution
+        """
+        action_prob = self.forward(state)
+        m = torch.distributions.Categorical(action_prob)
+        entropy = m.entropy().mean()
+        action = m.sample().item()
+        return action, entropy
 
 
 

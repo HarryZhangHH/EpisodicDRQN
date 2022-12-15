@@ -15,9 +15,9 @@ HIDDEN_SIZE = 256
 BATCH_SIZE = 128
 FEATURE_SIZE = 4
 NUM_LAYER = 1
-ALPHA = 0.01
-ENTROPY_COEF = 0.01
-CRITIC_COEF = 0.5
+ENTROPY_COEF = 0.5
+CRITIC_COEF = 0.1
+LEARNING_RATE = 0.01
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def a2c_selection(config: object, agents: dict, env: object):
@@ -42,21 +42,27 @@ def a2c_selection(config: object, agents: dict, env: object):
     max_play_times = config.n_episodes*5/n_agents
 
     SelectionFeatureNet = FeatureNet(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE * n_agents).to(device)
-    SelectionCriticNet = CriticNet(HIDDEN_SIZE*2, HIDDEN_SIZE).to(device)
+    SelectionCriticNet1 = CriticNet(HIDDEN_SIZE*2, HIDDEN_SIZE).to(device)
+    SelectionCriticNet2 = CriticNet(HIDDEN_SIZE*2, HIDDEN_SIZE, seed=43).to(device)   # Double-Q trick
     # SelectionMemory = ReplayBuffer(10000)
     # FeatureOptimizer = torch.optim.Adam([{'params': SelectionCriticNet.parameters()}], lr=config.learning_rate)
-    CriticOptimizer = torch.optim.Adam([
-                {'params': SelectionFeatureNet.parameters()},
-                {'params': SelectionCriticNet.parameters()},
-            ], lr=config.learning_rate)
+    # CriticOptimizer1 = torch.optim.Adam([
+    #             {'params': SelectionFeatureNet.parameters()},
+    #             {'params': SelectionCriticNet1.parameters()},
+    #         ], lr=config.learning_rate)
+    # CriticOptimizer2 = torch.optim.Adam([
+    #     {'params': SelectionFeatureNet.parameters()},
+    #     {'params': SelectionCriticNet2.parameters()},
+    # ], lr=config.learning_rate)
 
     for n in agents:
         agent = agents[n]
         agent.SelectionActorNet = ActorNet(HIDDEN_SIZE*2, HIDDEN_SIZE, n_agents-1).to(device)
         agent.SelectionOptimizer = torch.optim.Adam([
                 {'params': SelectionFeatureNet.parameters()},
-                # {'params': SelectionCriticNet.parameters()},
-                {'params': agent.SelectionActorNet.parameters()}
+                {'params': SelectionCriticNet1.parameters()},
+                {'params': SelectionCriticNet2.parameters()},
+                {'params': agent.SelectionActorNet.parameters(), 'lr': LEARNING_RATE}
             ], lr=config.learning_rate)
         agent.SelectionMemory = ReplayBuffer(100000)
 
@@ -95,8 +101,10 @@ def a2c_selection(config: object, agents: dict, env: object):
             state = (h_action[None].to(device), features[None].to(device))
             player.SelectionActorNet.eval()
             state = SelectionFeatureNet(state)
-            action_prob = player.SelectionActorNet(state.detach())
-            a = torch.distributions.Categorical(action_prob).sample().item()
+            # act
+            # print(f'Agent {n}')
+
+            a, _ = player.SelectionActorNet.act(state.detach())
             m = a+1 if a >= n else a
 
             # play and optimize PLAY model
@@ -122,40 +130,48 @@ def a2c_selection(config: object, agents: dict, env: object):
             action = torch.tensor(a1, dtype=torch.int64, device=device)
 
             # optimize UPDATE model
-            SelectionCriticNet.train()
+            SelectionCriticNet1.train()
+            SelectionCriticNet2.train()
             # SelectionFeatureNet.eval()
             agent1.SelectionActorNet.train()
-            values = SelectionCriticNet(state)
+            values1 = SelectionCriticNet1(state)
+            values2 = SelectionCriticNet2(state)
+            log_probs, entropy = agent1.SelectionActorNet.evaluate_action(state, action)
 
             with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
                 next_state = SelectionFeatureNet(next_state)
-                target = r1 + config.discount * (SelectionCriticNet(next_state))
+                target1 = SelectionCriticNet1(next_state)
+                target2 = SelectionCriticNet2(next_state)
+                target = r1 + config.discount * torch.min(target1 - target2) - ENTROPY_COEF * entropy
+                target = target.view(-1,1)
 
             # Update critic and actor
-            critic_loss = F.mse_loss(values, target)
-            advantages = target - values    # loss is measured from error between current and V values
-            log_probs, entropy = agent1.SelectionActorNet.evaluate_action(state, action)
+            critic1_loss = F.mse_loss(values1, target)
+            critic2_loss = F.mse_loss(values2, target)
+            advantages = target - torch.min(values1, values2)    # loss is measured from error between current and V values
+
             actor_loss = - (log_probs * advantages.detach()).mean()
-            # total_loss = (CRITIC_COEF * critic_loss) + actor_loss - (ENTROPY_COEF * entropy)
-            CriticOptimizer.zero_grad()
-            agent1.SelectionActorNet.zero_grad()
-            critic_loss.backward(retain_graph=True)
-            actor_loss.backward()
-            CriticOptimizer.step()
+            total_loss = (CRITIC_COEF * (critic1_loss + critic2_loss)) + actor_loss
+            # CriticOptimizer1.zero_grad()
+            # CriticOptimizer2.zero_grad()
+            agent1.SelectionOptimizer.zero_grad()
+            # critic1_loss.backward(retain_graph=True)
+            # critic2_loss.backward(retain_graph=True)
+            total_loss.backward()
+            # CriticOptimizer1.step()
+            # CriticOptimizer2.step()
             agent1.SelectionOptimizer.step()
 
             for param in SelectionFeatureNet.parameters():
                 param.grad.data.clamp_(-1,1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
-            for param in SelectionCriticNet.parameters():
+            for param in SelectionCriticNet1.parameters():
+                param.grad.data.clamp_(-1,1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
+            for param in SelectionCriticNet2.parameters():
                 param.grad.data.clamp_(-1,1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
             for param in agent1.SelectionActorNet.parameters():
                 param.grad.data.clamp_(-1,1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
 
             agent1.SelectionMemory.push(state, m, r1, next_state)
-
-            # epsilon decay
-            if agent1.config.select_epsilon > agent1.config.min_epsilon:
-                agent1.config.select_epsilon *= agent1.config.epsilon_decay
 
     return agents
 
