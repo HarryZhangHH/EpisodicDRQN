@@ -132,4 +132,4 @@ def generate_features(agent: object, max_reward: float, max_play_times: float):
     oppo_defect_ratio = calculate_sum(agent.opponent_memory)/agent.play_times
     own_reward_ratio = own_reward/max_reward
     play_times_ratio = min(1, agent.play_times/max_play_times)
-    return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_defect_ratio, play_times_ratio])
+    return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_defect_ratio])
