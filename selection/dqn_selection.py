@@ -30,7 +30,7 @@ def dqn_selection(config: object, agents: dict, env: object, rnn: bool = False):
     Returns
     -------
     agents: dict[object]
-        dictionary of n unupdated agents
+        dictionary of n updated agents
     """
     # construct selection network
     n_agents = len(agents)

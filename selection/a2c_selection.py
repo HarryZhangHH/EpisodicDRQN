@@ -3,7 +3,6 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from collections import namedtuple, deque
 import numpy as np
 
 from model import FeatureNet, CriticNet, ActorNet
@@ -22,7 +21,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def a2c_selection(config: object, agents: dict, env: object):
     """
-    SAC selection method using LSTM-Variant in sequential way
+    A2C selection method using LSTM-Variant in sequential way, online ning, on-policy
 
     Parameters
     ----------

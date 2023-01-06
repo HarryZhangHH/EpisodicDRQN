@@ -12,7 +12,7 @@ from utils import *
 TARGET_UPDATE = 10
 HIDDEN_SIZE = 256
 BATCH_SIZE = 128
-FEATURE_SIZE = 4
+FEATURE_SIZE = 3
 NUM_LAYER = 1
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
