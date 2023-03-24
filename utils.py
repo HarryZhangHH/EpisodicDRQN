@@ -133,3 +133,34 @@ def generate_features(agent: object, max_reward: float, max_play_times: float):
     own_reward_ratio = own_reward/max_reward
     play_times_ratio = min(1, agent.play_times/max_play_times)
     return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_defect_ratio])
+
+def generate_payoff_matrix(name:str, REWARD=3, TEMPTATION=None, SUCKER=None, PUNISHMENT=1, N=100):
+    """
+    Generate payoff matrix randomly
+
+    Args:
+        name: 'PD' or 'SH'
+    """
+    assert name == 'PD' or name == 'SH', f'Name {name} is wrong, please select one from ["PD","SH"]'
+    # prisoner's dilemma rule: TEMPTATION > REWARD > PUNISHMENT > SUCKER; 2*REWARD > TEMPTATION + SUCKER
+    if REWARD is not None and TEMPTATION is not None and SUCKER is not None and PUNISHMENT is not None:
+        return REWARD, TEMPTATION, SUCKER, PUNISHMENT
+    if name == 'PD':
+        TEMPTATION = np.round(np.random.uniform(REWARD+0.01, 2*REWARD-0.01, N), decimals=2)
+        x = np.ones(N)
+        REWARD = REWARD * x
+        SUM = np.round(np.random.uniform(TEMPTATION, 2*REWARD-0.01, N), decimals=2)
+        SUCKER = SUM - TEMPTATION
+        PUNISHMENT = np.round(np.random.uniform(SUCKER+0.01, REWARD-0.01, N), decimals=2)
+        assert np.sum(TEMPTATION > REWARD) == N and np.sum(REWARD > PUNISHMENT) == N and np.sum(PUNISHMENT > SUCKER) == N, f'{np.sum(TEMPTATION > REWARD)} and {np.sum(REWARD > PUNISHMENT)} and {np.sum(PUNISHMENT > SUCKER)}'
+        assert np.sum(2*REWARD > TEMPTATION + SUCKER) == N, f'{np.sum(2*REWARD > TEMPTATION + SUCKER)}'
+        return REWARD, TEMPTATION, SUCKER, PUNISHMENT
+    if name == 'SH':
+        # stag hunt rule: REWARD > TEMPTATION > PUNISHMENT > SUCKER; TEMPTATION + SUCKER > 2*PUNISHMENT
+        x = np.ones(N)
+        PUNISHMENT = PUNISHMENT * x
+        SUCKER = np.round(np.random.uniform(0, PUNISHMENT-0.01, N), decimals=2)
+        TEMPTATION = np.round(np.random.uniform(2*PUNISHMENT-SUCKER+0.01, 10-0.01, N), decimals=2)
+        REWARD = np.round(np.random.uniform(TEMPTATION+0.01, 10, N), decimals=2)
+        assert np.sum(REWARD > TEMPTATION) == N and np.sum(TEMPTATION > PUNISHMENT) == N and np.sum(PUNISHMENT > SUCKER) == N, f'{np.sum(REWARD > TEMPTATION)} and {np.sum(TEMPTATION > PUNISHMENT)} and {np.sum(PUNISHMENT > SUCKER)}'
+        return REWARD, TEMPTATION, SUCKER, PUNISHMENT

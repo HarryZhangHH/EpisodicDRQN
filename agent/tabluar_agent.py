@@ -27,6 +27,7 @@ class TabularAgent(AbstractAgent):
         self.config = config
         self.name = name
         self.h = min(3,config.h)
+        print(f'{self.h} previous actions are used')
         self.n_actions = config.n_actions
         self.own_memory = torch.zeros((config.n_episodes * 1000,))
         self.opponent_memory = torch.zeros((config.n_episodes * 1000,))
@@ -65,6 +66,8 @@ class TabularAgent(AbstractAgent):
         # epsilon decay
         if self.play_epsilon > self.config.min_epsilon:
             self.play_epsilon *= self.config.epsilon_decay
+        else:
+            self.play_epsilon = self.config.min_epsilon
         self.Policy.set_epsilon(self.play_epsilon)
         return a
 

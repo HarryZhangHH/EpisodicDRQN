@@ -1,4 +1,5 @@
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 from agent.abstract_agent import AbstractAgent
 from model import NeuralNetwork
 from utils import *
@@ -69,6 +70,8 @@ class DQNAgent(AbstractAgent):
         # epsilon decay
         if self.play_epsilon > self.config.min_epsilon:
             self.play_epsilon *= self.config.epsilon_decay
+        else:
+            self.play_epsilon = self.config.min_epsilon
         self.Policy.set_epsilon(self.play_epsilon)
         return a
 
@@ -135,7 +138,6 @@ class DQNAgent(AbstractAgent):
     def show(self):
         print("==================================================")
         print(f'Your action: {self.own_memory[self.play_times-20:self.play_times]}\nOppo action: {self.opponent_memory[self.play_times-20:self.play_times]}')
-
 
 
 

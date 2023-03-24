@@ -79,7 +79,7 @@ def twoSimulate(strategies: dict, num: int, config: object, delta: float = 0.000
         converge = question('Do you want to set the episode to infinity and it will stop automatically when policy converges')
     env = Environment(config)
     for s in strategies:
-        print("---------------------------------------------------------------------GAME---------------------------------------------------------------------")
+        print("--------------------------------------------------------------------- GAME ---------------------------------------------------------------------")
         print('You will use the strategy ' + strategies[num])
         print('You opponent uses the strategy '+strategies[s])
         env.reset()
@@ -96,20 +96,32 @@ def twoSimulate(strategies: dict, num: int, config: object, delta: float = 0.000
             env.play(agent1, agent2, config.n_episodes)
         if 'DQN' in agent1.name or 'LSTM' in agent1.name or 'A2C' in agent1.name:
             print(f'length of loss: {len(agent1.loss)}, average of loss (interval is 2): {np.mean(agent1.loss[::2])}, average of loss (interval is 20): {np.mean(agent1.loss[::20])}, average of loss (interval is 100): {np.mean(agent1.loss[::100])}')
-            plt.plot(agent1.loss[::20])
-            plt.title(f'agent1: {agent1.name}')
-            plt.show()
+            # plt.plot(agent1.loss[::20])
+            # plt.title(f'agent1: {agent1.name}')
+            # plt.show()
         if 'DQN' in agent2.name or 'LSTM' in agent2.name or 'A2C' in agent2.name:
             print(f'length of loss: {len(agent2.loss)}, average of loss (interval is 2): {np.mean(agent2.loss[::2])}, average of loss (interval is 20): {np.mean(agent2.loss[::20])}, average of loss (interval is 100): {np.mean(agent2.loss[::100])}')
-            plt.plot(agent2.loss[::20])
-            plt.title(f'agent:{agent2.name}')
+            # plt.plot(agent2.loss[::20])
+            # plt.title(f'agent:{agent2.name}')
             # plt.show()
         agent1.show()
         agent2.show()
         print("==================================================")
         print(f'{agent1.name} score: {agent1.running_score}\n{agent2.name} score: {agent2.running_score}')
-        print("----------------------------------------------------------------------------------------------------------------------------------------------")
+        print("------------------------------------------------------------------------------------------------------------------------------------------------")
         print()
+
+        x = [i for i in range(0, agent1.play_times)]
+        plt.figure(figsize=(20, 10))
+        plt.plot(x, agent1.own_memory[0:agent1.play_times], label=agent1.name, alpha=0.5)
+        plt.plot(x, agent2.own_memory[0:agent2.play_times], label=agent2.name, alpha=0.5)
+        plt.legend()
+        plt.ylim(-0.5, 2)
+        plt.xlim(0, agent1.play_times)
+        plt.title(f'agent:{agent1.name} vs agent:{agent2.name}')
+        plt.savefig(f'images/{agent1.name}vs{agent2.name}_result_h={config.h}.png')
+        plt.show()
+
         # print(agent1.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')), agent1.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))
         # if agent2.name == 'DQN':
         #     print(agent2.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')),
@@ -121,7 +133,7 @@ def twoSimulate(strategies: dict, num: int, config: object, delta: float = 0.000
 ########################################################################################################################
 
 # multi-agent PD benchmark
-MULTI_SELECTION_METHOD = 'A2C'
+MULTI_SELECTION_METHOD = 'RANDOM'
 def multiAgentSimulate(strategies: dict, config: object, selection_method: str = MULTI_SELECTION_METHOD):
     """
     Multi-agent simulation
@@ -173,7 +185,7 @@ def multiAgentSimulate(strategies: dict, config: object, selection_method: str =
     # for n in range(n_agents):
     #     if 'DQN' in selection_method:
     #         names['n_' + str(n)] = constructAgent('DQN', config)
-
+    ###################### SIMULTANEOUS ######################
     if selection_method == 'QLEARNING':
         # Partner selection using tabular q method
         agents = tabular_selection(config, agents, env)
@@ -190,6 +202,7 @@ def multiAgentSimulate(strategies: dict, config: object, selection_method: str =
     if selection_method == 'LSTM-VAR':
         agents = lstm_variant_selection(config, agents, env)
 
+    ###################### SEQUENTIAL #########################
     if selection_method == 'A2C':
         agents = a2c_selection(config, agents, env)
 

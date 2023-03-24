@@ -70,7 +70,7 @@ class StrategyAgent(AbstractAgent):
     
     def show(self):
         print("==================================================")
-        print(f'{self.name}\nYour action: {self.own_memory[:]}\nOppo action: {self.opponent_memory[:]}')
+        print(f'{self.name}\nYour action: {self.own_memory[-20:]}\nOppo action: {self.opponent_memory[-20:]}')
 
 def clip(x):
     if x >= 1:

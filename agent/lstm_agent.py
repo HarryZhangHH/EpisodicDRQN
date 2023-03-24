@@ -87,6 +87,8 @@ class LSTMAgent(AbstractAgent):
         # epsilon decay
         if self.play_epsilon > self.config.min_epsilon:
             self.play_epsilon *= self.config.epsilon_decay
+        else:
+            self.play_epsilon = self.config.min_epsilon
         self.Policy.set_epsilon(self.play_epsilon)
         return a
 
