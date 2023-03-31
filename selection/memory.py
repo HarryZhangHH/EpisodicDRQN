@@ -46,3 +46,13 @@ class ReplayBuffer(Memory):
             return random.sample(self.memory, batch_size)
         else:
             return random.sample(list(self.memory)[-LENGTH:], batch_size)
+
+class SettlementMemory(Memory):
+    """
+    Used for multi-agent games
+    """
+    def __init__(self, capacity: int):
+        super(SettlementMemory, self).__init__(capacity)
+
+    def push(self, *args):
+        self.memory.append(Agent(*args))

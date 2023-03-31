@@ -48,6 +48,17 @@ class AbstractAgent():
         """
         pass
 
+    def determine_convergence(self, threshold: int, k: int):
+        if self.play_times < 2 * k:
+            return False
+        history_1 = self.own_memory[self.play_times-k : self.play_times]
+        history_2 = self.own_memory[self.play_times-2*k : self.play_times-k]
+        difference = torch.sum(torch.abs(history_1 - history_2))
+        if difference > threshold:
+            return False
+        else:
+            return True
+
     class EpsilonPolicy(object):
         """
         A simple epsilon greedy policy.
@@ -88,6 +99,13 @@ class AbstractAgent():
             else:
                 a = random.randint(0, self.n_actions-1)
             return a
+
+        def update_epsilon(self, config:object):
+            # epsilon decay
+            if self.epsilon > config.min_epsilon:
+                self.epsilon *= config.epsilon_decay
+            if self.epsilon <= config.min_epsilon:
+                self.epsilon = config.min_epsilon
 
         def set_epsilon(self, epsilon):
             self.epsilon = epsilon

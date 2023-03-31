@@ -108,16 +108,16 @@ def main():
         simulation.twoSimulate(strategies, num, config)
 
     if choice == 2:
-        print('right now you are a rl agent, choice one strategy')
-        print(rl_choices)
-        rl_num = int(input('choose a strategy via number '))
+        print('right now you are an agent, choice one strategy')
+        print(choices)
+        num1 = int(input('choose a strategy via number '))
         print('who do you want to play against')
         print(choices)
-        num = int(input('choose a strategy via number '))
+        num2 = int(input('choose a strategy via number '))
         # rounds = int(input('how many rounds do you want to play:'))
         # if rounds > config.n_episodes:
         #     config.n_episodes = rounds
-        simulation.twoSimulate(dict({num: strategies[num], rl_num: strategies[rl_num]}), rl_num, config)
+        simulation.twoSimulate(dict({num1: strategies[num1], num2: strategies[num2]}), num1, num2, config)
 
     if choice == 3:
         simulation.multiAgentSimulate(strategies, config)

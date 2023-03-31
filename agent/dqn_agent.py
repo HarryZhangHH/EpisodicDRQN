@@ -24,10 +24,9 @@ class DQNAgent(AbstractAgent):
         self.name = name
         self.own_memory = torch.zeros((config.n_episodes*10000, ))
         self.opponent_memory = torch.zeros((config.n_episodes*10000, ))
-        self.play_epsilon = config.play_epsilon
         self.State = self.StateRepr(method=config.state_repr)
         self.build()
-        self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
+        self.Policy = self.EpsilonPolicy(self.PolicyNet, config.play_epsilon, config.n_actions)  # an object
         self.Memory = self.ReplayBuffer(BUFFER_SIZE)  # an object
         self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
         self.loss = []
@@ -66,13 +65,6 @@ class DQNAgent(AbstractAgent):
     def __select_action(self):
         """ selection action based on epsilon greedy policy """
         a = self.Policy.sample_action(self.State.state)
-
-        # epsilon decay
-        if self.play_epsilon > self.config.min_epsilon:
-            self.play_epsilon *= self.config.epsilon_decay
-        else:
-            self.play_epsilon = self.config.min_epsilon
-        self.Policy.set_epsilon(self.play_epsilon)
         return a
 
     def update(self, reward: float, own_action: int, opponent_action: int):
@@ -134,6 +126,9 @@ class DQNAgent(AbstractAgent):
         # print(f'transition: \n{np.hstack((state.numpy(),action.numpy(),next_state.numpy(),reward.numpy()))}')
         # print(f'transition: \nstate: {np.squeeze(state.numpy())}\naction: {np.squeeze(action.numpy())}\nnext_s: {np.squeeze(next_state.numpy())}\nreward: {np.squeeze(reward.numpy())}')
         # print(f'loss: {loss.item()}')
+
+    def determine_convergence(self, threshold: int, k: int):
+        return super(DQNAgent, self).determine_convergence(threshold, k)
 
     def show(self):
         print("==================================================")

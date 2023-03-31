@@ -72,63 +72,117 @@ def benchmark(strategies: dict, num: int, config: object):
         Q_table_list.append(agent1.Q_table)
     return Q_table_list
 
-def twoSimulate(strategies: dict, num: int, config: object, delta: float = 0.0001):
-    converge = False
+def twoSimulate(strategies: dict, num1: int, num2:int, config: object, delta: float = 0.0001, k: int = 1000):
+    converge_flag = False
+    alter_flag = True # alternate learning
     seed_everything()
-    if 'Learning' in strategies[num]:
-        converge = question('Do you want to set the episode to infinity and it will stop automatically when policy converges')
+    if num1 >= 7 or num2 >= 7:
+        converge_flag = question('Do you want to set the episode to infinity and it will stop automatically when policy converges')
     env = Environment(config)
-    for s in strategies:
-        print("--------------------------------------------------------------------- GAME ---------------------------------------------------------------------")
-        print('You will use the strategy ' + strategies[num])
-        print('You opponent uses the strategy '+strategies[s])
-        env.reset()
-        agent1 = constructAgent(strategies[num], config)
-        agent2 = constructAgent(strategies[s], config)
-        if converge:
-            Q_table = agent1.Q_table.clone()
-            while True:
-                env.play(agent1, agent2, 20*config.h)
-                if torch.sum(agent1.Q_table-Q_table) < delta:
-                    break
-                Q_table = agent1.Q_table.clone()
+    print("--------------------------------------------------------------------- GAME ---------------------------------------------------------------------")
+    print('You will use the strategy ' + strategies[num1])
+    print('You opponent uses the strategy '+strategies[num2])
+    env.reset()
+    agent1 = constructAgent(strategies[num1], config)
+    agent2 = constructAgent(strategies[num2], config)
+    converge_agent1 = True
+    converge_agent2 = True
+    if converge_flag:
+        if num1 >= 7:
+            converge_agent1 = False
+        if num2 >= 7:
+            converge_agent2 = False
+
+        thresh = 2 * k * config.min_epsilon
+        while True:
+            if num1 >= 7 and num2 >=7 and alter_flag:
+                twoSimulateAlter(agent1, agent2, config, env, k)
+            else:
+                env.play(agent1, agent2, k)
+
+            converge_agent1 = agent1.determine_convergence(thresh, k)
+            converge_agent2 = agent2.determine_convergence(thresh, k)
+
+            print(converge_agent1, converge_agent2)
+            if converge_agent1 and converge_agent2:
+                break
+            if agent1.play_times >= thresh * k:
+                break
+
+            # Q_table = agent1.Q_table.clone()
+            # while True:
+            #     env.play(agent1, agent2, 20*config.h)
+            #     if torch.sum(agent1.Q_table-Q_table) < delta:
+            #         break
+            #     Q_table = agent1.Q_table.clone()
+        print(f'Convergence: Agent1:{converge_agent1}, Agent2:{converge_agent2}')
+    else:
+        if num1 >= 7 and num2 >= 7 and alter_flag:
+            twoSimulateAlter(agent1, agent2, config, env)
         else:
             env.play(agent1, agent2, config.n_episodes)
-        if 'DQN' in agent1.name or 'LSTM' in agent1.name or 'A2C' in agent1.name:
-            print(f'length of loss: {len(agent1.loss)}, average of loss (interval is 2): {np.mean(agent1.loss[::2])}, average of loss (interval is 20): {np.mean(agent1.loss[::20])}, average of loss (interval is 100): {np.mean(agent1.loss[::100])}')
-            # plt.plot(agent1.loss[::20])
-            # plt.title(f'agent1: {agent1.name}')
-            # plt.show()
-        if 'DQN' in agent2.name or 'LSTM' in agent2.name or 'A2C' in agent2.name:
-            print(f'length of loss: {len(agent2.loss)}, average of loss (interval is 2): {np.mean(agent2.loss[::2])}, average of loss (interval is 20): {np.mean(agent2.loss[::20])}, average of loss (interval is 100): {np.mean(agent2.loss[::100])}')
-            # plt.plot(agent2.loss[::20])
-            # plt.title(f'agent:{agent2.name}')
-            # plt.show()
-        agent1.show()
-        agent2.show()
-        print("==================================================")
-        print(f'{agent1.name} score: {agent1.running_score}\n{agent2.name} score: {agent2.running_score}')
-        print("------------------------------------------------------------------------------------------------------------------------------------------------")
-        print()
 
-        x = [i for i in range(0, agent1.play_times)]
-        plt.figure(figsize=(20, 10))
-        plt.plot(x, agent1.own_memory[0:agent1.play_times], label=agent1.name, alpha=0.5)
-        plt.plot(x, agent2.own_memory[0:agent2.play_times], label=agent2.name, alpha=0.5)
-        plt.legend()
-        plt.ylim(-0.5, 2)
-        plt.xlim(0, agent1.play_times)
-        plt.title(f'agent:{agent1.name} vs agent:{agent2.name}')
-        plt.savefig(f'images/{agent1.name}vs{agent2.name}_result_h={config.h}.png')
-        plt.show()
+    if 'DQN' in agent1.name or 'LSTM' in agent1.name or 'A2C' in agent1.name:
+        print(f'length of loss: {len(agent1.loss)}, average of loss (interval is 2): {np.mean(agent1.loss[::2])}, average of loss (interval is 20): {np.mean(agent1.loss[::20])}, average of loss (interval is 100): {np.mean(agent1.loss[::100])}')
+        # plt.plot(agent1.loss[::20])
+        # plt.title(f'agent1: {agent1.name}')
+        # plt.show()
+    if 'DQN' in agent2.name or 'LSTM' in agent2.name or 'A2C' in agent2.name:
+        print(f'length of loss: {len(agent2.loss)}, average of loss (interval is 2): {np.mean(agent2.loss[::2])}, average of loss (interval is 20): {np.mean(agent2.loss[::20])}, average of loss (interval is 100): {np.mean(agent2.loss[::100])}')
+        # plt.plot(agent2.loss[::20])
+        # plt.title(f'agent:{agent2.name}')
+        # plt.show()
+    agent1.show()
+    agent2.show()
+    print("==================================================")
+    print(f'{agent1.name} score: {agent1.running_score}\n{agent2.name} score: {agent2.running_score}')
+    print("------------------------------------------------------------------------------------------------------------------------------------------------")
+    print()
 
-        # print(agent1.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')), agent1.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))
-        # if agent2.name == 'DQN':
-        #     print(agent2.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')),
-        #           agent2.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))
+    x = [i for i in range(0, agent1.play_times)]
+    plt.figure(figsize=(20, 10))
+    plt.plot(x, agent1.own_memory[0:agent1.play_times], label=agent1.name, alpha=0.5)
+    plt.plot(x, agent2.own_memory[0:agent2.play_times], label=agent2.name, alpha=0.5)
+    plt.legend()
+    plt.ylim(-0.5, 2)
+    plt.xlim(0, agent1.play_times)
+    plt.title(f'agent:{agent1.name} vs agent:{agent2.name}')
+    plt.savefig(f'images/{agent1.name}vs{agent2.name}_result_h={config.h}.png')
+    plt.show()
+
+    # print(agent1.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')), agent1.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))
+    # if agent2.name == 'DQN':
+    #     print(agent2.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')),
+    #           agent2.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))
+
+def twoSimulateAlter(agent1: object, agent2: object, config: object, env: object, k: int = None):
+    transition_episode = 2*config.batch_size
+    n_epsiode = k if k is not None else config.n_episode
+    for i in range(n_epsiode):
+        if i // transition_episode % 2 == 0:
+            # agent 1 learns (high learning rate)
+            if i % transition_episode == 0:
+                agent1.Memory.clean()
+                agent1.Optimizer = torch.optim.Adam(agent1.PolicyNet.parameters(), lr=config.learning_rate)
+                agent2.Optimizer = torch.optim.Adam(agent2.PolicyNet.parameters(), lr=config.learning_rate*0.01)
+        else:
+            # agent 2 learns (high learning rate)
+            if i % transition_episode == 0:
+                agent2.Memory.clean()
+                agent1.Optimizer = torch.optim.Adam(agent1.PolicyNet.parameters(), lr=config.learning_rate * 0.01)
+                agent2.Optimizer = torch.optim.Adam(agent2.PolicyNet.parameters(), lr=config.learning_rate)
+        a1, a2 = agent1.act(agent2), agent2.act(agent1)
+        _, r1, r2 = env.step(a1, a2)
+        env.optimize(agent1, agent2, a1, a2, r1, r2)
+
+        if i // transition_episode % 2 == 0:
+            # agent 1 learns (high learning rate)
+            agent1.Policy.update_epsilon(config)
+        else:
+            # agent 2 learns (high learning rate)
+            agent2.Policy.update_epsilon(config)
 
 
-########################################################################################################################
 ################################################### MULTI-AGENT GAME ###################################################
 ########################################################################################################################
 

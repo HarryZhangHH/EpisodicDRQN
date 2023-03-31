@@ -8,7 +8,7 @@ import sys
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 TARGET_UPDATE = 100
 HIDDEN_SIZE = 128
-FEATURE_SIZE = 8
+FEATURE_SIZE = 4
 BUFFER_SIZE = 1000
 NUM_LAYER = 1
 
@@ -26,10 +26,9 @@ class LSTMAgent(AbstractAgent):
         self.name = name
         self.own_memory = torch.zeros((config.n_episodes*1000, ))
         self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
-        self.play_epsilon = config.play_epsilon
         self.State = self.StateRepr(method=config.state_repr)
         self.build() if 'repr' not in config.state_repr else self.build2()
-        self.Policy = self.EpsilonPolicy(self.PolicyNet, self.play_epsilon, self.config.n_actions)  # an object
+        self.Policy = self.EpsilonPolicy(self.PolicyNet, config.play_epsilon, config.n_actions)  # an object
         self.Memory = self.ReplayBuffer(BUFFER_SIZE)  # an object
         self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
         self.loss = []
@@ -83,13 +82,6 @@ class LSTMAgent(AbstractAgent):
     def __select_action(self):
         """selection action based on epsilon greedy policy """
         a = self.Policy.sample_action(self.State.state)
-
-        # epsilon decay
-        if self.play_epsilon > self.config.min_epsilon:
-            self.play_epsilon *= self.config.epsilon_decay
-        else:
-            self.play_epsilon = self.config.min_epsilon
-        self.Policy.set_epsilon(self.play_epsilon)
         return a
 
     def generate_feature(self, oppo_agent: object):
@@ -210,6 +202,9 @@ class LSTMAgent(AbstractAgent):
         # print(f'transition: \n{np.hstack((state.numpy(),action.numpy(),next_state.numpy(),reward.numpy()))}')
         # print(f'transition: \nstate: {np.squeeze(state.numpy())}\naction: {np.squeeze(action.numpy())}\nnext_s: {np.squeeze(next_state.numpy())}\nreward: {np.squeeze(reward.numpy())}')
         # print(f'loss: {loss.item()}')
+
+    def determine_convergence(self, threshold: int, k: int):
+        return super(LSTMAgent, self).determine_convergence(threshold, k)
 
     def show(self):
         print("==================================================")

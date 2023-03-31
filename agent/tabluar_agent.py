@@ -2,7 +2,7 @@ import random
 import torch
 from agent.abstract_agent import AbstractAgent
 from agent.fix_strategy_agent import StrategyAgent
-from utils import argmax, label_encode
+from utils import argmax, label_encode, Type
 from env import Environment
 
 MADTHRESHOLD = 5
@@ -62,13 +62,6 @@ class TabularAgent(AbstractAgent):
     def __select_action(self):
         """ selection action based on epsilon greedy policy """
         a = self.Policy.sample_action(self.State.state)
-
-        # epsilon decay
-        if self.play_epsilon > self.config.min_epsilon:
-            self.play_epsilon *= self.config.epsilon_decay
-        else:
-            self.play_epsilon = self.config.min_epsilon
-        self.Policy.set_epsilon(self.play_epsilon)
         return a
 
     def update(self, reward: float, own_action: int, opponent_action: int):
@@ -108,6 +101,14 @@ class TabularAgent(AbstractAgent):
                 self.Q_table[state, action] = self.Q_table[state, action] + self.config.alpha * \
                                               (G - self.Q_table[state, action])
                 state_buffer.append(state)
+
+    # def determine_convergence(self, delta:float, Q_table: Type.TensorType):
+    #     if torch.sum(self.Q_table - Q_table) < delta:
+    #         return True
+    #     else:
+    #         return False
+    def determine_convergence(self, threshold: int, k: int):
+        return super(TabularAgent, self).determine_convergence(threshold, k)
 
     def reset(self):
         """ reset all attribute values expect Q_table for episode-end game """

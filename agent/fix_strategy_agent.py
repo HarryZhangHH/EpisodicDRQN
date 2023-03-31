@@ -63,11 +63,14 @@ class StrategyAgent(AbstractAgent):
         self.opponent_memory.append(opponent_action)
         self.own_action = own_action
 
+    def determine_convergence(self, threshold: int, k: int):
+        return True
+
     def reset(self):
         super(StrategyAgent, self).reset()
         self.own_memory = []
         self.opponent_memory = []
-    
+
     def show(self):
         print("==================================================")
         print(f'{self.name}\nYour action: {self.own_memory[-20:]}\nOppo action: {self.opponent_memory[-20:]}')
