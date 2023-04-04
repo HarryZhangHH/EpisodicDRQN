@@ -12,7 +12,8 @@ class StrategyAgent(AbstractAgent):
         self.own_memory = []
         self.opponent_memory = []
         self.State = self.StateRepr(method=config.state_repr)
-        
+        self.Policy = self.EpsilonPolicy(None, None, None)
+
     def roll(self):
         return random.randint(0,1)
 

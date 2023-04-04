@@ -112,12 +112,7 @@ class LSTMAgent(AbstractAgent):
         self.opponent_memory[self.play_times - 1] = opponent_action
         # self.State.oppo_memory = self.opponent_memory[:self.play_times]
 
-    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None):
-        """ push the trajectoriy into the ReplayBuffer and optimize the model """
-        super(LSTMAgent, self).optimize(action, reward, oppo_agent)
-        if self.State.state is None:
-            return None
-
+    def get_next_state(self,  oppo_agent: object, state: Type.TensorType = None):
         # get opponent's last h move
         opponent_h_actions = torch.as_tensor(
             oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
@@ -129,6 +124,15 @@ class LSTMAgent(AbstractAgent):
             feature = self.generate_feature(oppo_agent)
             self.State.next_state = (self.State.next_state.numpy(), feature.numpy())
             self.State.state = (self.State.state[0].numpy(), self.State.state[1].numpy()) if state is None else (state[0].numpy(), state[1].numpy())
+
+    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None):
+        """ push the trajectoriy into the ReplayBuffer and optimize the model """
+        super(LSTMAgent, self).optimize(action, reward, oppo_agent)
+        if self.State.state is None:
+            return None
+
+        # get opponent's last h move
+        self.get_next_state(oppo_agent, state)
 
         # push the transition into ReplayBuffer
         if self.name == 'LSTM':
@@ -142,25 +146,20 @@ class LSTMAgent(AbstractAgent):
         if self.play_times % TARGET_UPDATE == 0:
             self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
 
-    def __optimize_model(self):
-        """ Train and optimize our model """
-        # don't learn without some decent experience
-        if len(self.Memory.memory) < self.config.batch_size:
-            return None
-        # random transition batch is taken from experience replay memory
-        transitions = self.Memory.sample(self.config.batch_size)
+    def get_batch(self, transitions):
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
         state, action, next_state, reward = zip(*transitions)
+        criterion = None
         # convert to PyTorch and define types
         if self.name == 'LSTM':
             if 'repr' in self.config.state_repr:
-                h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).to(device).view(self.config.batch_size, self.config.h, -1)
-                features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).to(device).view(self.config.batch_size, FEATURE_SIZE)
+                h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:, 0]).astype(np.float)).to(
+                    device).view(self.config.batch_size, self.config.h, -1)
+                features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:, 1]).astype(np.float)).to(
+                    device).view(self.config.batch_size, FEATURE_SIZE)
                 state = (h_action, features)
             else:
                 state = torch.stack(list(state), dim=0).view(self.config.batch_size, self.config.h, -1).to(device)
-            target = torch.tensor(next_state, dtype=torch.int64, device=device)
-            outputs = self.PolicyNet(state)
             criterion = nn.CrossEntropyLoss()
 
         elif self.name == 'LSTMQN':
@@ -171,25 +170,47 @@ class LSTMAgent(AbstractAgent):
                 # print( torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float64)).view(self.config.batch_size, self.config.h, -1))
                 # print( torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float64)).size())
                 # sys.exit()
-                h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).view(self.config.batch_size, self.config.h, -1).to(device)
-                features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).view(self.config.batch_size, FEATURE_SIZE).to(device)
+                h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:, 0]).astype(np.float)).view(
+                    self.config.batch_size, self.config.h, -1).to(device)
+                features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:, 1]).astype(np.float)).view(
+                    self.config.batch_size, FEATURE_SIZE).to(device)
                 state = (h_action, features)
-                h_action = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,0]).astype(np.float)).view(self.config.batch_size, self.config.h, -1).to(device)
-                features = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,1]).astype(np.float)).view(self.config.batch_size, FEATURE_SIZE).to(device)
+                h_action = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:, 0]).astype(np.float)).view(
+                    self.config.batch_size, self.config.h, -1).to(device)
+                features = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:, 1]).astype(np.float)).view(
+                    self.config.batch_size, FEATURE_SIZE).to(device)
                 next_state = (h_action, features)
             else:
                 state = torch.stack(list(state), dim=0).view(self.config.batch_size, self.config.h, -1).to(device)
-                next_state = torch.stack(list(next_state), dim=0).view(self.config.batch_size, self.config.h, -1).to(device)
-            action = torch.tensor(action, dtype=torch.int64, device=device)[:,None]  # Need 64 bit to use them as index
-            reward = torch.tensor(reward, dtype=torch.float, device=device)[:,None]
+                next_state = torch.stack(list(next_state), dim=0).view(self.config.batch_size, self.config.h, -1).to(
+                    device)
+            action = torch.tensor(action, dtype=torch.int64, device=device)[:, None]  # Need 64 bit to use them as index
+            reward = torch.tensor(reward, dtype=torch.float, device=device)[:, None]
             criterion = nn.SmoothL1Loss()
+
+        return criterion, state, action, reward, next_state
+
+    def __optimize_model(self):
+        """ Train and optimize our model """
+        # don't learn without some decent experience
+        if len(self.Memory.memory) < self.config.batch_size:
+            return None
+        # random transition batch is taken from experience replay memory
+        transitions = self.Memory.sample(self.config.batch_size)
+
+        criterion, state, action, reward, next_state = self.get_batch(transitions)
+
+        if self.name == 'LSTM':
+            target = torch.tensor(next_state, dtype=torch.int64, device=device)
+            outputs = self.PolicyNet(state)
+        elif self.name == 'LSTMQN':
             # compute the q value
             outputs = compute_q_vals(self.PolicyNet, state, action)
             with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
                 target = compute_targets(self.TargetNet, reward, next_state, self.config.discount)
-
         # loss is measured from error between current and newly expected Q values
         loss = criterion(outputs, target)
+
         # backpropagation of loss to Neural Network (PyTorch magic)
         self.Optimizer.zero_grad()
         loss.backward()

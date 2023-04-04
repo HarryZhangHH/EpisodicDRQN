@@ -72,7 +72,7 @@ class AbstractAgent():
             self.Q = Q
             self.epsilon = epsilon
             self.n_actions = n_actions
-        def sample_action(self, obs: Type.TensorType):
+        def sample_action(self, obs: Type.TensorType, q_vals: Type.TensorType = None):
             """
             This method takes a state as input and returns an action sampled from this policy.
             ----------
@@ -85,8 +85,11 @@ class AbstractAgent():
             if obs is None:
                 return random.randint(0, self.n_actions-1)
             prob = random.random()
+
             if prob > self.epsilon:
-                if torch.is_tensor(self.Q):
+                if q_vals is not None:
+                    a = argmax(q_vals)
+                elif torch.is_tensor(self.Q):
                     a = argmax(self.Q[obs])
                 else:
                     self.Q.eval()
@@ -101,6 +104,8 @@ class AbstractAgent():
             return a
 
         def update_epsilon(self, config:object):
+            if self.epsilon is None:
+                return None
             # epsilon decay
             if self.epsilon > config.min_epsilon:
                 self.epsilon *= config.epsilon_decay

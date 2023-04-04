@@ -1,4 +1,5 @@
 import torch.nn.functional as F
+import torch.nn as nn
 import matplotlib.pyplot as plt
 from agent.abstract_agent import AbstractAgent
 from model import NeuralNetwork
@@ -73,11 +74,7 @@ class DQNAgent(AbstractAgent):
         self.opponent_memory[self.play_times - 1] = opponent_action
         # self.State.oppo_memory = self.opponent_memory[:self.play_times]
 
-    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None):
-        super(DQNAgent, self).optimize(action, reward, oppo_agent)
-        if self.State.state is None:
-            return None
-
+    def get_next_state(self,  oppo_agent: object, state: Type.TensorType = None):
         # get next state
         opponent_h_actions = torch.as_tensor(
             oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
@@ -86,6 +83,13 @@ class DQNAgent(AbstractAgent):
         self.State.next_state = self.State.state_repr(opponent_h_actions, own_h_actions)
         self.State.state = self.State.state if state is None else state
 
+    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None):
+        super(DQNAgent, self).optimize(action, reward, oppo_agent)
+        if self.State.state is None:
+            return None
+
+        self.get_next_state(oppo_agent)
+
         # push the transition into ReplayBuffer
         self.Memory.push(self.State.state, action, self.State.next_state, reward)
         self.__optimize_model()
@@ -93,27 +97,36 @@ class DQNAgent(AbstractAgent):
         if self.play_times % TARGET_UPDATE == 0:
             self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
 
-    def __optimize_model(self):
-        """ Train our model """
-        # don't learn without some decent experience
-        if len(self.Memory.memory) < self.config.batch_size:
-            return None
-        # random transition batch is taken from experience replay memory
-        transitions = self.Memory.sample(self.config.batch_size)
+    def get_batch(self, transitions):
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
         state, action, next_state, reward = zip(*transitions)
+
         # convert to PyTorch and define types
         state = torch.stack(list(state), dim=0).to(device)
         action = torch.tensor(action, dtype=torch.int64, device=device)[:, None]  # Need 64 bit to use them as index
         next_state = torch.stack(list(next_state), dim=0).to(device)
         reward = torch.tensor(reward, dtype=torch.float, device=device)[:, None]
+        # loss is measured from error between current and newly expected Q values
+        criterion = nn.SmoothL1Loss()
+
+        return criterion, state, action, reward, next_state
+
+    def __optimize_model(self):
+        """ Train and optimize our model """
+        # don't learn without some decent experience
+        if len(self.Memory.memory) < self.config.batch_size:
+            return None
+        # random transition batch is taken from experience replay memory
+        transitions = self.Memory.sample(self.config.batch_size)
+
+        criterion, state, action, reward, next_state = self.get_batch(transitions)
+
         # compute the q value
         q_val = compute_q_vals(self.PolicyNet, state, action)
         with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
             target = compute_targets(self.TargetNet, reward, next_state, self.config.discount)
+        loss = criterion(q_val, target)
 
-        # loss is measured from error between current and newly expected Q values
-        loss = F.smooth_l1_loss(q_val, target)
         # backpropagation of loss to Neural Network (PyTorch magic)
         self.Optimizer.zero_grad()
         loss.backward()
