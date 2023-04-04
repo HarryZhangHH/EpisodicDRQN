@@ -155,7 +155,7 @@ def twoSimulate(strategies: dict, num1: int, num2:int, config: object, delta: fl
     #     print(agent2.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')),
     #           agent2.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))
 
-def twoSimulateAlter(agent1: object, agent2: object, config: object, env: object, k: int = None):
+def twoSimulateAlter(agent1: object, agent2: object, config: object, env: object, k: int = None, lr_scale: float = 0.001):
     transition_episode = 2*config.batch_size
     n_epsiode = k if k is not None else config.n_episode
     for i in range(n_epsiode):
@@ -164,12 +164,12 @@ def twoSimulateAlter(agent1: object, agent2: object, config: object, env: object
             if i % transition_episode == 0:
                 agent1.Memory.clean()
                 agent1.Optimizer = torch.optim.Adam(agent1.PolicyNet.parameters(), lr=config.learning_rate)
-                agent2.Optimizer = torch.optim.Adam(agent2.PolicyNet.parameters(), lr=config.learning_rate*0.01)
+                agent2.Optimizer = torch.optim.Adam(agent2.PolicyNet.parameters(), lr=config.learning_rate*lr_scale)
         else:
             # agent 2 learns (high learning rate)
             if i % transition_episode == 0:
                 agent2.Memory.clean()
-                agent1.Optimizer = torch.optim.Adam(agent1.PolicyNet.parameters(), lr=config.learning_rate * 0.01)
+                agent1.Optimizer = torch.optim.Adam(agent1.PolicyNet.parameters(), lr=config.learning_rate*lr_scale)
                 agent2.Optimizer = torch.optim.Adam(agent2.PolicyNet.parameters(), lr=config.learning_rate)
         a1, a2 = agent1.act(agent2), agent2.act(agent1)
         _, r1, r2 = env.step(a1, a2)
@@ -187,7 +187,7 @@ def twoSimulateAlter(agent1: object, agent2: object, config: object, env: object
 ########################################################################################################################
 
 # multi-agent PD benchmark
-MULTI_SELECTION_METHOD = 'RANDOM'
+MULTI_SELECTION_METHOD = None
 def multiAgentSimulate(strategies: dict, config: object, selection_method: str = MULTI_SELECTION_METHOD):
     """
     Multi-agent simulation
@@ -257,6 +257,12 @@ def multiAgentSimulate(strategies: dict, config: object, selection_method: str =
         agents = lstm_variant_selection(config, agents, env)
 
     ###################### SEQUENTIAL #########################
+    if selection_method is None:
+        agents, select_dict, selected_dict, belief, losses = maxmin_dqrn_selection_play(config, agents, env)
+        print(f'select times: {select_dict}')
+        print(f'selected times: {selected_dict}')
+        print(f'belief: {np.squeeze(belief)}')
+
     if selection_method == 'A2C':
         agents = a2c_selection(config, agents, env)
 
@@ -270,8 +276,9 @@ def multiAgentSimulate(strategies: dict, config: object, selection_method: str =
                       list(agents[n].opponent_memory[:agents[n].play_times]).count(1) / len(agents[n].opponent_memory[:agents[n].play_times])))
     print('The reward for total society: {}'.format(env.running_score / len(agents)))
 
+    plt.figure(figsize=(20, 10))
     for n in agents:
-        transitions = agents[n].SelectionMemory.memory
+        transitions = agents[n].SelectionMemoryLog.memory
         _, actions, rewards, _ = zip(*transitions)
         actions = get_index_from_action(np.array(actions, dtype=int), idx)
         actions, rewards = np.array(actions), np.array(rewards)
@@ -280,6 +287,13 @@ def multiAgentSimulate(strategies: dict, config: object, selection_method: str =
         print(f' opponent_idx: {list(values)}, counts: {list(counts)} ', end='')
         dict_idx = {x: rewards[np.where(actions == x)] for x in values}
         print(f'rewards: {[np.mean(y) for _, y in dict_idx.items()]}')
+
+        x = [i for i in range(0, agents[n].play_times)]
+        plt.plot(x, agents[n].own_memory[0:agents[n].play_times], label=agents[n].name+' '+str(n), alpha=0.5)
+    plt.legend()
+    plt.ylim(-0.5, 2)
+    plt.savefig(f'images/maxmin-dqrn.png')
+    plt.show()
 
 
 def get_index_from_action(action, idx):
