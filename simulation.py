@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from agent import *
 from selection import *
-from utils import label_encode, argmax, iterate_combination, question, seed_everything, HiddenPrints
+from utils import *
 from env import Environment
 import sys
 
@@ -181,6 +181,153 @@ def twoSimulateAlter(agent1: object, agent2: object, config: object, env: object
         else:
             # agent 2 learns (high learning rate)
             agent2.Policy.update_epsilon(config)
+
+def twoSimulateBenchmark(name: str, config: object, k: int = 1000, lr_scale: float = 0):
+    UPDATE_TIMES = 10
+    seed_everything()
+    # converge_flag = question(
+    #     'Do you want to set the episode to infinity and it will stop automatically when policy converges')
+    env = Environment(config)
+
+    agent1 = constructAgent(name, config)
+    agent2 = constructAgent('ALLC', config)
+    count = 0
+    test_state_list = generate_state(agent1, config.h, config.n_actions, k)
+    test_q_dict = {'agent1': {}}
+    convergence = False
+
+    while not convergence:
+        agent2_pi = np.round(np.random.random(),2)
+        transition_episode = np.random.randint(config.batch_size, 5*config.batch_size)
+        print(f'Agent 2 Policy: {agent2_pi}, Episode Count: {transition_episode}')
+        for i in range(transition_episode):
+            a1 = agent1.act(agent2)
+            sample = np.random.random()
+            a2 = 1 if sample <= agent2_pi else 0
+            _, r1, r2 = env.step(a1, a2)
+            agent1.update(r1, a1, a2)
+            agent2.update(r2, a2, a1)
+            agent1.optimize(a1, r1, agent2, flag=True)
+
+        # Strategy convergence
+        thresh = 2 * k * config.min_epsilon
+        converge_agent1 = agent1.determine_convergence(thresh, k)
+        print(f'Strategy Convergent: {agent1.play_times}') if converge_agent1 else None
+
+        test_q_agent1_list = []
+        agent1.PolicyNet.eval()
+
+        for test_state in test_state_list:
+            test_q_agent1 = agent1.PolicyNet(test_state[None])
+            test_q_agent1_list.append(test_q_agent1.to('cpu').detach().numpy())
+
+        agent1.PolicyNet.train()
+        test_q_dict['agent1'][count] = test_q_agent1_list
+        diff = np.sum(np.diff(test_q_dict['agent1'][count])) - np.sum(np.diff(test_q_dict['agent1'][count-1])) if count > 1 else np.inf
+        convergence = True if diff < k/100 and converge_agent1 is True else False
+        count += 1
+
+        if agent1.play_times >= 200*k:
+            break
+
+    for l in test_q_dict['agent1']:
+        values, counts = np.unique(np.array(test_q_dict['agent1'][l]), axis=0, return_counts=True)
+        print(f"Difference: {np.sum(np.diff(test_q_dict['agent1'][l]))}")
+        print(l, np.unique(counts, return_counts=True))
+
+    print(f'Playing episodes: {agent1.play_times}')
+    agent1.show()
+
+def twoSimulateAlterBenchmark(name: str, config: object, k: int = 1000, lr_scale: float = 0):
+    UPDATE_TIMES = 10
+    seed_everything()
+    print(config.__repr__)
+    env = Environment(config)
+
+    agent1 = constructAgent(name, config)
+    agent2 = constructAgent('ALLC', config)
+    count = 0
+    test_state_list = generate_state(agent1, config.h, config.n_actions, k)
+    test_q_dict = {'agent1': {}}
+    strategy_convergent_episode = 0
+
+    while True:
+        agent2_pi = np.round(np.random.random(),2)
+        transition_episode = np.random.randint(config.batch_size, 5*config.batch_size)
+        print(f'Agent 2 Policy: {agent2_pi}, Episode Count: {transition_episode}', end='')
+        for i in range(transition_episode):
+            # agent 1 learns (high learning rate)
+            if i % transition_episode == 0:
+                for _ in range(UPDATE_TIMES):
+                    if len(agent1.Memory.memory) < config.batch_size:
+                        continue
+                    # random transition batch is taken from experience replay memory
+                    transitions = agent1.Memory.sample(config.batch_size)
+
+                    criterion, state, action, reward, next_state = agent1.get_batch(transitions)
+
+                    # compute the q value
+                    outputs = compute_q_vals(agent1.PolicyNet, state, action)
+                    with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
+                        target = compute_targets(agent1.TargetNet, reward, next_state, config.discount)
+                    # loss is measured from error between current and newly expected Q values
+                    loss = criterion(outputs, target)
+
+                    # backpropagation of loss to Neural Network (PyTorch magic)
+                    agent1.Optimizer.zero_grad()
+                    loss.backward()
+                    for param in agent1.PolicyNet.parameters():
+                        param.grad.data.clamp_(-1,1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
+                    agent1.Optimizer.step()
+                    agent1.loss.append(loss.item())
+                    agent1.Policy.update_epsilon(config)
+
+                agent1.Memory.clean()
+                agent1.TargetNet.load_state_dict(agent1.PolicyNet.state_dict())
+
+            a1 = agent1.act(agent2)
+            sample = np.random.random()
+            a2 = 1 if sample <= agent2_pi else 0
+            _, r1, r2 = env.step(a1, a2)
+            agent1.update(r1, a1, a2)
+            agent2.update(r2, a2, a1)
+            agent1.optimize(a1, r1, agent2, flag=False)
+
+        # Strategy convergence
+        thresh = k * config.min_epsilon + 2
+        converge_agent1 = agent1.determine_convergence(thresh, k)
+        strategy_convergent_episode = agent1.play_times if not converge_agent1 else strategy_convergent_episode
+        # print(f' Strategy Convergent: {agent1.play_times}') if converge_agent1 else None
+
+        test_q_agent1_list = []
+        agent1.PolicyNet.eval()
+
+        for test_state in test_state_list:
+            test_q_agent1 = agent1.PolicyNet(test_state[None])
+            test_q_agent1_list.append(test_q_agent1.to('cpu').detach().numpy())
+
+        agent1.PolicyNet.train()
+        test_q_dict['agent1'][count] = test_q_agent1_list
+        diff = np.sum(np.diff(test_q_dict['agent1'][count])) - np.sum(np.diff(test_q_dict['agent1'][count-1])) if count > 1 else np.inf
+        print(f' Difference: {np.abs(diff)}')
+        count += 1
+
+        if np.abs(diff) < 10 and converge_agent1 is True:
+            break
+        if agent1.play_times >= config.n_episodes:
+            break
+
+    network_convergent_episode = agent1.play_times if agent1.play_times < config.n_episodes else None
+
+    for l in test_q_dict['agent1']:
+        values, counts = np.unique(np.array(test_q_dict['agent1'][l]), axis=0, return_counts=True)
+        print(f" Q value difference: {np.sum(np.diff(test_q_dict['agent1'][l]))}")
+        print(l, np.unique(counts, return_counts=True))
+
+    print(f'Playing episodes: {agent1.play_times}')
+    agent1.show()
+    print(strategy_convergent_episode, network_convergent_episode)
+    return agent1, strategy_convergent_episode, network_convergent_episode
 
 
 ################################################### MULTI-AGENT GAME ###################################################

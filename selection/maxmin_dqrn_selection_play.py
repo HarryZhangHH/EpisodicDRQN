@@ -11,7 +11,7 @@ from selection.memory import UpdateMemory, ReplayBuffer, SettlementMemory
 from utils import *
 
 TARGET_UPDATE = 10
-HIDDEN_SIZE = 256
+HIDDEN_SIZE = 128
 BATCH_SIZE = 64
 FEATURE_SIZE = 1
 BUFFER_SIZE = 1000
@@ -169,6 +169,9 @@ def initialize_agent_configuration(agents:dict):
         agent.SelectionOptimizer = torch.optim.Adam(agent.SelectionPolicyNet.parameters(), lr=agent.config.learning_rate)
         agent.SelectionTargetNet.eval()
 
+        # for name, param in agent.SelectionPolicyNet.named_parameters():
+        #     print(name, param.data)
+
 def play(agent1: object, agent2: object, env:object):
     a1, a2 = agent1.act(agent2), agent2.act(agent1)
     if agent1.State.state is not None and agent2.State.state is not None:
@@ -191,10 +194,10 @@ def __optimize_selection_model(agent: object, n_agents: int):
     state, action, reward, next_state = zip(*transitions)
     # convert to PyTorch and define types
     h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).view(BATCH_SIZE, agent.config.h, n_agents).to(device)
-    features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).view(BATCH_SIZE, FEATURE_SIZE*n_agents).to(device)
+    features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).view(BATCH_SIZE, max(1,FEATURE_SIZE)*n_agents).to(device)
     state = (h_action, features)
     h_action = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,0]).astype(np.float)).view(BATCH_SIZE, agent.config.h, n_agents).to(device)
-    features = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,1]).astype(np.float)).view(BATCH_SIZE, FEATURE_SIZE*n_agents).to(device)
+    features = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,1]).astype(np.float)).view(BATCH_SIZE, max(1,FEATURE_SIZE)*n_agents).to(device)
     next_state = (h_action, features)
 
     action = torch.tensor(action, dtype=torch.int64, device=device)[:, None]  # Need 64 bit to use them as index

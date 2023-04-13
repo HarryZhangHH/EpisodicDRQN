@@ -83,7 +83,7 @@ class DQNAgent(AbstractAgent):
         self.State.next_state = self.State.state_repr(opponent_h_actions, own_h_actions)
         self.State.state = self.State.state if state is None else state
 
-    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None):
+    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None, flag: bool=True):
         super(DQNAgent, self).optimize(action, reward, oppo_agent)
         if self.State.state is None:
             return None
@@ -92,10 +92,12 @@ class DQNAgent(AbstractAgent):
 
         # push the transition into ReplayBuffer
         self.Memory.push(self.State.state, action, self.State.next_state, reward)
-        self.__optimize_model()
-        # Update the target network, copying all weights and biases in DQN
-        if self.play_times % TARGET_UPDATE == 0:
-            self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
+
+        if flag:
+            self.__optimize_model()
+            # Update the target network, copying all weights and biases in DQN
+            if self.play_times % TARGET_UPDATE == 0:
+                self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
 
     def get_batch(self, transitions):
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)

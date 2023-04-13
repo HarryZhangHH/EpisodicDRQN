@@ -134,33 +134,78 @@ def generate_features(agent: object, max_reward: float, max_play_times: float):
     play_times_ratio = min(1, agent.play_times/max_play_times)
     return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_defect_ratio])
 
-def generate_payoff_matrix(name:str, REWARD=3, TEMPTATION=None, SUCKER=None, PUNISHMENT=1, N=100):
+def generate_payoff_matrix(name:str = 'PD', REWARD:int = 1, TEMPTATION:int = None, SUCKER:int = None, PUNISHMENT:int = 0, N:int = 100):
     """
     Generate payoff matrix randomly
 
     Args:
-        name: 'PD' or 'SH'
+        name: 'PD' or 'SH' or 'SD' or 'Ha'
+              PD --> Prisoner's Dilemma     SH --> Stag Hunt    SD --> Snowdrift     Ha --> Harmony
+                        S = 1
+                  Harmony  |  Snowdrift
+             0 ------------1-----------> T = 2
+                 Stag Hunt | Prisoner's Dilemma
+                         S = -1
     """
-    assert name == 'PD' or name == 'SH', f'Name {name} is wrong, please select one from ["PD","SH"]'
-    # prisoner's dilemma rule: TEMPTATION > REWARD > PUNISHMENT > SUCKER; 2*REWARD > TEMPTATION + SUCKER
+    assert name == 'PD' or name == 'SH' or name == 'SD' or name == 'Ha', f'Name {name} is wrong, please select one from ["PD","SH"]'
     if REWARD is not None and TEMPTATION is not None and SUCKER is not None and PUNISHMENT is not None:
         return REWARD, TEMPTATION, SUCKER, PUNISHMENT
+    x = np.ones(N)
+    reward = REWARD * x
+    punishment = PUNISHMENT * x
     if name == 'PD':
-        TEMPTATION = np.round(np.random.uniform(REWARD+0.01, 2*REWARD-0.01, N), decimals=2)
-        x = np.ones(N)
-        REWARD = REWARD * x
-        SUM = np.round(np.random.uniform(TEMPTATION, 2*REWARD-0.01, N), decimals=2)
-        SUCKER = SUM - TEMPTATION
-        PUNISHMENT = np.round(np.random.uniform(SUCKER+0.01, REWARD-0.01, N), decimals=2)
-        assert np.sum(TEMPTATION > REWARD) == N and np.sum(REWARD > PUNISHMENT) == N and np.sum(PUNISHMENT > SUCKER) == N, f'{np.sum(TEMPTATION > REWARD)} and {np.sum(REWARD > PUNISHMENT)} and {np.sum(PUNISHMENT > SUCKER)}'
-        assert np.sum(2*REWARD > TEMPTATION + SUCKER) == N, f'{np.sum(2*REWARD > TEMPTATION + SUCKER)}'
-        return REWARD, TEMPTATION, SUCKER, PUNISHMENT
+        # prisoner's dilemma rule: TEMPTATION > REWARD > PUNISHMENT > SUCKER; 2*REWARD > TEMPTATION + SUCKER;
+        # REWARD = 1; PUNISHMENT = 0; TEMPTATION > 1; -1 < SUCKER < 0
+        sucker = np.round(np.random.uniform(-1, punishment-0.01, N), decimals=2)
+        temptation = np.round(np.random.uniform(reward+0.01, 2*reward-sucker-0.01, N), decimals=2)
+        assert np.sum(temptation > reward) == N and np.sum(reward > punishment) == N and np.sum(punishment > sucker) == N, f'{np.sum(temptation > reward)} and {np.sum(reward > punishment)} and {np.sum(punishment > sucker)}'
+        assert np.sum(2*reward > temptation + sucker) == N, f'{np.sum(2*reward > temptation + sucker)}'
+        return reward, temptation, sucker, punishment
     if name == 'SH':
-        # stag hunt rule: REWARD > TEMPTATION > PUNISHMENT > SUCKER; TEMPTATION + SUCKER > 2*PUNISHMENT
-        x = np.ones(N)
-        PUNISHMENT = PUNISHMENT * x
-        SUCKER = np.round(np.random.uniform(0, PUNISHMENT-0.01, N), decimals=2)
-        TEMPTATION = np.round(np.random.uniform(2*PUNISHMENT-SUCKER+0.01, 10-0.01, N), decimals=2)
-        REWARD = np.round(np.random.uniform(TEMPTATION+0.01, 10, N), decimals=2)
-        assert np.sum(REWARD > TEMPTATION) == N and np.sum(TEMPTATION > PUNISHMENT) == N and np.sum(PUNISHMENT > SUCKER) == N, f'{np.sum(REWARD > TEMPTATION)} and {np.sum(TEMPTATION > PUNISHMENT)} and {np.sum(PUNISHMENT > SUCKER)}'
-        return REWARD, TEMPTATION, SUCKER, PUNISHMENT
+        # stag hunt rule: REWARD > TEMPTATION > PUNISHMENT > SUCKER; TEMPTATION + SUCKER >= 2*PUNISHMENT;
+        # REWARD = 1; PUNISHMENT = 0; -1 < SUCKER < 0; TEMPTATION < 1; -1 < REWARD - TEMPTATION + PUNISHMENT - SUCKER < 1
+        diff = np.round(np.random.uniform(-1, 2.5, N), decimals=2)
+        reward = np.maximum(reward+diff, reward)
+        temptation = np.round(np.random.uniform(punishment+0.01, 1-0.01, N), decimals=2)
+        temptation = np.minimum(temptation, 1-0.01)
+        sucker = np.minimum(diff+temptation-reward-punishment, -0.01)
+        # sucker = np.round(np.random.uniform(-1+0.5, punishment-0.01, N), decimals=2)
+        # temptation = np.round(np.random.uniform(2*punishment-sucker, reward-0.01, N), decimals=2)
+        assert np.sum(reward > temptation) == N and np.sum(temptation > punishment) == N and np.sum(punishment > sucker) == N, f'{np.sum(reward > temptation)} and {np.sum(temptation > punishment)} and {np.sum(punishment > sucker)}'
+        return reward, temptation, sucker, punishment
+    if name == 'SD':
+        # snowdrift (chicken) rule: TEMPTATION > REWARD > SUCKER > PUNISHMENT;
+        # REWARD = 1; PUNISHMENT = 0; SUCKER > 0; TEMPTATION > 1
+        sucker = np.round(np.random.uniform(punishment + 0.01, reward - 0.01, N), decimals=2)
+        temptation = np.round(np.random.uniform(reward + 0.01, 2*reward, N), decimals=2)
+        assert np.sum(temptation > reward) == N and np.sum(reward > sucker) == N and np.sum(
+            sucker > punishment) == N, f'{np.sum(temptation > reward)} and {np.sum(reward > sucker)} and {np.sum(sucker > punishment)}'
+        return reward, temptation, sucker, punishment
+    if name == 'Ha':
+        # harmony rule: REWARD > TEMPTATION > SUCKER > PUNISHMENT;
+        # REWARD = 1; PUNISHMENT = 0; SUCKER > 0; TEMPTATION < 1
+        temptation = np.round(np.random.uniform(punishment + 0.02, reward - 0.01, N), decimals=2)
+        sucker = np.round(np.random.uniform(punishment + 0.01, temptation-0.01, N), decimals=2)
+        assert np.sum(reward > temptation) == N and np.sum(temptation > sucker) == N and np.sum(
+            sucker > punishment) == N, f'{np.sum(reward > temptation)} and {np.sum(temptation > sucker)} and {np.sum(sucker > punishment)}'
+        return reward, temptation, sucker, punishment
+
+def generate_state(agent: object, h: int, n_actions: int, k: int):
+    # enumerate binary to generate h actions
+    binary_enum = [i for i in range(n_actions ** h)]
+    binary_list = []
+    for i in binary_enum:
+        x = [int(j) for j in list(bin(i).split('b')[1])]
+        while len(x) < h:
+            x.insert(0, 0)
+        binary_list.append(torch.as_tensor(x))
+
+    state_list = []
+    for _ in range(k):
+        h_actions = random.choices(binary_list, k=2)
+        own_h_actions, opponent_h_actions = h_actions[0], h_actions[1]
+
+        state = agent.State.state_repr(opponent_h_actions, own_h_actions)
+        state = torch.permute(state.view(-1, h), (1, 0))  # important
+        state_list.append(state)
+    return state_list

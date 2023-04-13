@@ -18,6 +18,7 @@ class Memory(object):
         return len(self.memory)
 
 Agent = namedtuple('Agent', ['agent_1', 'agent_2', 'action_1', 'action_2', 'reward_1', 'reward_2', 'state_1', 'state_2'])
+AgentLog = namedtuple('Agent', ['agent_1', 'agent_2', 'action_1', 'action_2', 'reward_1', 'reward_2', 'state_1', 'state_2','next_state_1', 'next_state_2'])
 Buffer = namedtuple('ReplyBuffer', ['state', 'action', 'reward', 'next_state'])
 
 class UpdateMemory(Memory):
@@ -55,4 +56,4 @@ class SettlementMemory(Memory):
         super(SettlementMemory, self).__init__(capacity)
 
     def push(self, *args):
-        self.memory.append(Agent(*args))
+        self.memory.append(AgentLog(*args))

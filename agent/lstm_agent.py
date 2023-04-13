@@ -125,7 +125,7 @@ class LSTMAgent(AbstractAgent):
             self.State.next_state = (self.State.next_state.numpy(), feature.numpy())
             self.State.state = (self.State.state[0].numpy(), self.State.state[1].numpy()) if state is None else (state[0].numpy(), state[1].numpy())
 
-    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None):
+    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None, flag: bool=True):
         """ push the trajectoriy into the ReplayBuffer and optimize the model """
         super(LSTMAgent, self).optimize(action, reward, oppo_agent)
         if self.State.state is None:
@@ -139,12 +139,13 @@ class LSTMAgent(AbstractAgent):
             self.Memory.push(self.State.state, action, int(oppo_agent.own_memory[oppo_agent.play_times - 1]), reward)
         if self.name == 'LSTMQN':
             self.Memory.push(self.State.state, action, self.State.next_state, reward)
-        
-        # print(f'Episode {self.play_times}:  {own_action}, {opponent_action}') if self.play_times > self.config.batch_size else None
-        self.__optimize_model()
-        # Update the target network, copying all weights and biases in DQN
-        if self.play_times % TARGET_UPDATE == 0:
-            self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
+
+        if flag:
+            # print(f'Episode {self.play_times}:  {own_action}, {opponent_action}') if self.play_times > self.config.batch_size else None
+            self.__optimize_model()
+            # Update the target network, copying all weights and biases in DQN
+            if self.play_times % TARGET_UPDATE == 0:
+                self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
 
     def get_batch(self, transitions):
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)

@@ -23,6 +23,8 @@ class Environment():
             a1, a2 = agent1.act(agent2), agent2.act(agent1)
             _, r1, r2 = self.step(a1, a2)
             self.optimize(agent1, agent2, a1, a2, r1, r2)
+            agent1.Policy.update_epsilon(self.config)
+            agent2.Policy.update_epsilon(self.config)
         return r1, r2
 
     def optimize(self, agent1: object, agent2: object, a1: int, a2: int, r1: float, r2: float):
