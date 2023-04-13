@@ -100,7 +100,13 @@ def main():
         # print('here are the strategies, choose one\n', choices)
         # num = int(input('choose a strategy via number '))
         # print('You will use the strategy ' + strategies[num])
-        simulation.benchmark(strategies, None, config)
+        # simulation.benchmark(strategies, None, config)
+
+        print('here are the strategies, choose one\n', rl_choices)
+        num = int(input('choose a strategy via number '))
+        simulation.twoSimulateAlterBenchmark(strategies[num], config)  # Alter DQRN
+        # simulation.twoSimulateBenchmark(strategies[num], config)  # Orignial DQRN
+
 
     if choice == 1:
         print('here are the strategies, choose one\n', choices)
