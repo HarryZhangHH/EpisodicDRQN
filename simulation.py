@@ -182,7 +182,7 @@ def twoSimulateAlter(agent1: object, agent2: object, config: object, env: object
             # agent 2 learns (high learning rate)
             agent2.Policy.update_epsilon(config)
 
-def twoSimulateBenchmark(name: str, config: object, episodic_flag: bool = True, k: int = 1000, sg_flag: bool =False, lr_scale: float = 0):
+def twoSimulateBenchmark(name: str, config: object, k: int = 1000, episodic_flag: bool = True, sg_flag: bool =False, lr_scale: float = 0):
     UPDATE_TIMES = 20
     seed_everything()
     print(config.__repr__)
@@ -198,7 +198,7 @@ def twoSimulateBenchmark(name: str, config: object, episodic_flag: bool = True, 
     reward_convergent_episode = 0
     last_reward = 0
     converge_agent1_reward = False
-    thresh_strategy = k * config.min_epsilon + 2
+    thresh_strategy = k * config.min_epsilon + 5
     thresh_network = config.n_episodes
     thresh_reward = 0.01
 
