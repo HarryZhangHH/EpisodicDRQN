@@ -134,7 +134,7 @@ def generate_features(agent: object, max_reward: float, max_play_times: float):
     play_times_ratio = min(1, agent.play_times/max_play_times)
     return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_defect_ratio])
 
-def generate_payoff_matrix(name:str = 'PD', REWARD:int = 1, TEMPTATION:int = None, SUCKER:int = None, PUNISHMENT:int = 0, N:int = 100):
+def generate_payoff_matrix(name:str = 'PD', REWARD:int = 1, TEMPTATION:int = None, SUCKER:int = None, PUNISHMENT:int = 0, N:int = 100, seed:int = 42):
     """
     Generate payoff matrix randomly
 
@@ -150,6 +150,8 @@ def generate_payoff_matrix(name:str = 'PD', REWARD:int = 1, TEMPTATION:int = Non
     assert name == 'PD' or name == 'SH' or name == 'SD' or name == 'Ha', f'Name {name} is wrong, please select one from ["PD","SH"]'
     if REWARD is not None and TEMPTATION is not None and SUCKER is not None and PUNISHMENT is not None:
         return REWARD, TEMPTATION, SUCKER, PUNISHMENT
+    np.random.seed(seed)
+    K = 0.2
     x = np.ones(N)
     reward = REWARD * x
     punishment = PUNISHMENT * x
@@ -157,14 +159,15 @@ def generate_payoff_matrix(name:str = 'PD', REWARD:int = 1, TEMPTATION:int = Non
         # prisoner's dilemma rule: TEMPTATION > REWARD > PUNISHMENT > SUCKER; 2*REWARD > TEMPTATION + SUCKER;
         # REWARD = 1; PUNISHMENT = 0; TEMPTATION > 1; -1 < SUCKER < 0
         sucker = np.round(np.random.uniform(-1, punishment-0.01, N), decimals=2)
-        temptation = np.round(np.random.uniform(reward+0.01, 2*reward-sucker-0.01, N), decimals=2)
+        # temptation = np.round(np.random.uniform(reward+0.01, 2*reward-sucker-0.01, N), decimals=2)
+        temptation = np.clip(np.random.uniform(reward-K+0.01, 2*reward-sucker-0.01, N), reward+0.01, 2*reward-sucker-0.01)
         assert np.sum(temptation > reward) == N and np.sum(reward > punishment) == N and np.sum(punishment > sucker) == N, f'{np.sum(temptation > reward)} and {np.sum(reward > punishment)} and {np.sum(punishment > sucker)}'
         assert np.sum(2*reward > temptation + sucker) == N, f'{np.sum(2*reward > temptation + sucker)}'
         return reward, temptation, sucker, punishment
     if name == 'SH':
         # stag hunt rule: REWARD > TEMPTATION > PUNISHMENT > SUCKER; TEMPTATION + SUCKER >= 2*PUNISHMENT;
         # REWARD = 1; PUNISHMENT = 0; -1 < SUCKER < 0; TEMPTATION < 1; -1 < REWARD - TEMPTATION + PUNISHMENT - SUCKER < 1
-        diff = np.round(np.random.uniform(-1, 2.5, N), decimals=2)
+        diff = np.round(np.random.uniform(-1, 3, N), decimals=2)
         reward = np.maximum(reward+diff, reward)
         temptation = np.round(np.random.uniform(punishment+0.01, 1-0.01, N), decimals=2)
         temptation = np.minimum(temptation, 1-0.01)
@@ -190,7 +193,8 @@ def generate_payoff_matrix(name:str = 'PD', REWARD:int = 1, TEMPTATION:int = Non
             sucker > punishment) == N, f'{np.sum(reward > temptation)} and {np.sum(temptation > sucker)} and {np.sum(sucker > punishment)}'
         return reward, temptation, sucker, punishment
 
-def generate_state(agent: object, h: int, n_actions: int, k: int):
+def generate_state(agent: object, h: int, n_actions: int, k: int, seed:int = 42):
+    seed_everything(seed)
     # enumerate binary to generate h actions
     binary_enum = [i for i in range(n_actions ** h)]
     binary_list = []

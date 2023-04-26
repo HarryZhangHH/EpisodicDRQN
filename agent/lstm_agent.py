@@ -143,6 +143,7 @@ class LSTMAgent(AbstractAgent):
         if flag:
             # print(f'Episode {self.play_times}:  {own_action}, {opponent_action}') if self.play_times > self.config.batch_size else None
             self.__optimize_model()
+            self.Policy.update_epsilon(self.config)
             # Update the target network, copying all weights and biases in DQN
             if self.play_times % TARGET_UPDATE == 0:
                 self.TargetNet.load_state_dict(self.PolicyNet.state_dict())

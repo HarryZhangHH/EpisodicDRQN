@@ -27,7 +27,7 @@ class AbstractAgent():
         self.play_times += 1
     __update = update
 
-    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None):
+    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None, flag: bool = True):
         pass
     __optimize = optimize
 
