@@ -31,8 +31,8 @@ class Environment():
         # can not be called in the multi-agent game
         agent1.update(r1, a1, a2)
         agent2.update(r2, a2, a1)
-        agent1.optimize(a1, r1, agent2, flag)
-        agent2.optimize(a2, r2, agent1, flag)
+        agent1.optimize(a1, r1, agent2, flag=flag)
+        agent2.optimize(a2, r2, agent1, flag=flag)
 
     def step(self, a1: int, a2: int, sg_flag: bool = False):
         """
@@ -104,7 +104,7 @@ class StochasticGameEnvironment(Environment):
         else: return 1
 
     def optimize(self, agent1: object, agent2: object, a1: int, a2: int, r1: float, r2: float, flag: bool = True):
-        super(StochasticGameEnvironment, self).optimize(agent1, agent2, a1, a2, r1, r2, flag)
+        super(StochasticGameEnvironment, self).optimize(agent1, agent2, a1, a2, r1, r2, flag=flag)
         s = self.check_state(agent1, agent2)
         self.s = s
         # print(f'game:{self.s}') if self.s == 0 else None

@@ -161,6 +161,7 @@ def generate_payoff_matrix(name:str = 'PD', REWARD:int = 1, TEMPTATION:int = Non
         sucker = np.round(np.random.uniform(-1, punishment-0.01, N), decimals=2)
         # temptation = np.round(np.random.uniform(reward+0.01, 2*reward-sucker-0.01, N), decimals=2)
         temptation = np.clip(np.random.uniform(reward-K+0.01, 2*reward-sucker-0.01, N), reward+0.01, 2*reward-sucker-0.01)
+        temptation = np.round(temptation, decimals=2)
         assert np.sum(temptation > reward) == N and np.sum(reward > punishment) == N and np.sum(punishment > sucker) == N, f'{np.sum(temptation > reward)} and {np.sum(reward > punishment)} and {np.sum(punishment > sucker)}'
         assert np.sum(2*reward > temptation + sucker) == N, f'{np.sum(2*reward > temptation + sucker)}'
         return reward, temptation, sucker, punishment
