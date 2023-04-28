@@ -104,7 +104,7 @@ def main():
 
         print('here are the strategies, choose one\n', rl_choices)
         num = int(input('choose a strategy via number '))
-        simulation.twoSimulateBenchmark(strategies[num], config, episodic_flag=True, sg_flag=True)  # Episodic DQRN
+        simulation.twoSimulateBenchmark(strategies[num], config, episodic_flag=True, sg_flag=False)  # Episodic DQRN
         # simulation.twoSimulateBenchmark(strategies[num], config)  # Orignial DQRN
 
 

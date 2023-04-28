@@ -183,7 +183,7 @@ def twoSimulateAlter(agent1: object, agent2: object, config: object, env: object
             agent2.Policy.update_epsilon(config)
 
 def twoSimulateBenchmark(name: str, config: object, k: int = 1000, episodic_flag: bool = True, sg_flag: bool =False, lr_scale: float = 0):
-    UPDATE_TIMES = 20
+    UPDATE_TIMES = 10
     seed_everything()
     print(config.__repr__)
     env = Environment(config) if not sg_flag else StochasticGameEnvironment(config)
