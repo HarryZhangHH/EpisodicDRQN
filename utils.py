@@ -95,33 +95,6 @@ def seed_everything(seed=42):
     torch.backends.cudnn.deterministic = True
     # env.seed(seed)
 
-def compute_q_vals(Q, states, actions):
-    """
-    This method returns Q values for given state action pairs.
-
-    Args:
-        Q: Q-net  (object)
-        states: a tensor of states. Shape: batch_size x obs_dim
-        actions: a tensor of actions. Shape: Shape: batch_size x 1
-    Returns:
-        A torch tensor filled with Q values. Shape: batch_size x 1.
-    """
-    return torch.gather(Q(states), 1, actions)
-
-def compute_targets(Q, rewards, next_states, discount_factor):
-    """
-    This method returns targets (values towards which Q-values should move).
-
-    Args:
-        Q: Q-net  (object)
-        rewards: a tensor of rewards. Shape: Shape: batch_size x 1
-        next_states: a tensor of states. Shape: batch_size x obs_dim
-        discount_factor: discount
-    Returns:
-        A torch tensor filled with target values. Shape: batch_size x 1.
-    """
-    return rewards + discount_factor * torch.max(Q(next_states), 1)[0].view(-1, 1)
-
 def generate_features(agent: object, max_reward: float, max_play_times: float):
     """
     Generate extra features
@@ -210,7 +183,7 @@ def generate_state(agent: object, h: int, n_actions: int, k: int, seed:int = 42)
         h_actions = random.choices(binary_list, k=2)
         own_h_actions, opponent_h_actions = h_actions[0], h_actions[1]
 
-        state = agent.State.state_repr(opponent_h_actions, own_h_actions)
+        state = agent.state.state_repr(opponent_h_actions, own_h_actions)
         state = torch.permute(state.view(-1, h), (1, 0))  # important
         state_list.append(state)
     return state_list

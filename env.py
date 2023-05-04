@@ -17,6 +17,8 @@ class Environment():
         self.config = config
         self.episode = 0
         self.running_score = 0.0
+        self.state_count = 1
+        print('======= Initialize the environment: Repeated Game =======')
 
     def play(self, agent1: object, agent2: object, episodes: int):
         for i in range(episodes):
@@ -34,7 +36,7 @@ class Environment():
         agent1.optimize(a1, r1, agent2, flag=flag)
         agent2.optimize(a2, r2, agent1, flag=flag)
 
-    def step(self, a1: int, a2: int, sg_flag: bool = False):
+    def step(self, a1: int, a2: int):
         """
         Repeated Game
         action:
@@ -54,17 +56,10 @@ class Environment():
         elif a1==1 and a2==1:
             r1, r2 = self.config.punishment, self.config.punishment
 
-        if sg_flag:
-            # stag hunt
-            if a1 == 0 and a2 == 0:
-                r1, r2 = self.config.temptation, self.config.temptation
-            elif a1 == 0 and a2 == 1:
-                r1, r2 = self.config.sucker, self.config.reward
-            elif a1 == 1 and a2 == 0:
-                r1, r2 = self.config.reward, self.config.sucker
-            elif a1 == 1 and a2 == 1:
-                r1, r2 = self.config.punishment, self.config.punishment
         return episode, r1, r2
+
+    def update_state(self, agents: dict):
+        pass
 
     def update(self, reward: int):
         self.running_score = reward + self.config.discount * self.running_score
@@ -93,21 +88,33 @@ class StochasticGameEnvironment(Environment):
     """
 
     def __init__(self, config: object):
-        super(StochasticGameEnvironment, self).__init__(config)
+        self.config = config
+        self.episode = 0
+        self.running_score = 0.0
         self.s = 1
+        self.state_count = 2
+        print('======= Initialize the environment: Stochastic Game =======')
 
     @staticmethod
-    def check_state(agent1: object, agent2: object):
-        if agent1.play_times >= agent1.config.h and agent2.play_times >= agent2.config.h:
-            state = sum(agent1.own_memory[agent1.play_times - agent1.config.h: agent1.play_times]) + sum(agent2.own_memory[agent2.play_times - agent2.config.h: agent2.play_times])
-            return int(min(state,1))
-        else: return 1
+    def check_state(agents: dict):
+        state = 1
+        for n in agents:
+            if agents[n].play_times < agents[n].config.h:
+                return 1
+            else:
+                state += sum(agents[n].own_memory[agents[n].play_times-agents[n].config.h:agents[n].play_times])
+        return state
 
     def optimize(self, agent1: object, agent2: object, a1: int, a2: int, r1: float, r2: float, flag: bool = True):
         super(StochasticGameEnvironment, self).optimize(agent1, agent2, a1, a2, r1, r2, flag=flag)
-        s = self.check_state(agent1, agent2)
-        self.s = s
+        agents = {}
+        agents[0], agents[1] = agent1, agent2
+        self.update_state(agents)
         # print(f'game:{self.s}') if self.s == 0 else None
+
+    def update_state(self, agents: dict):
+        s = self.check_state(agents)
+        self.s = int(min(s,1))
 
     def step(self, a1: int, a2: int):
         """
@@ -148,4 +155,7 @@ class StochasticGameEnvironment(Environment):
 
     def reset(self):
         super(StochasticGameEnvironment, self).reset()
+        self.s = 1
+
+    def reset_state(self):
         self.s = 1
