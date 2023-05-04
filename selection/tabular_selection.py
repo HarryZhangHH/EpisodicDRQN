@@ -1,10 +1,9 @@
-import numpy as np
 import torch
 import random
 from utils import label_encode, argmax, iterate_combination
 from tqdm import tqdm
-from collections import namedtuple, deque
-from selection.memory import Memory
+from collections import namedtuple
+from component.memory import Memory
 
 H = 2
 Agent = namedtuple('Agent', ['state', 'action', 'agent_1', 'agent_2', 'action_1', 'action_2', 'reward_1', 'reward_2'])

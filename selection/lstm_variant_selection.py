@@ -1,12 +1,8 @@
-import random
-import sys
 from tqdm import tqdm
-import torch
 import torch.nn as nn
-from collections import namedtuple, deque
 
-from model import LSTMVariant
-from selection.memory import UpdateMemory, ReplayBuffer
+from model import LSTMVariant, DQN
+from component.memory import UpdateMemory, ReplayBuffer, Memory
 from utils import *
 
 TARGET_UPDATE = 10
@@ -38,11 +34,11 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
 
     for n in agents:
         agent = agents[n]
-        agent.SelectionPolicyNet = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1, HIDDEN_SIZE).to(device)
-        agent.SelectionTargetNet = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1, HIDDEN_SIZE).to(device)
-        agent.SelectionTargetNet.load_state_dict(agent.SelectionPolicyNet.state_dict())
-        agent.SelectionMemory = ReplayBuffer(10000)
-        agent.SelectionOptimizer = torch.optim.Adam(agent.SelectionPolicyNet.parameters(), lr=config.learning_rate)
+        agent.selection_policy_net = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1, HIDDEN_SIZE).to(device)
+        agent.selection_target_net = LSTMVariant(n_agents, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE*n_agents, n_agents-1, HIDDEN_SIZE).to(device)
+        agent.selection_target_net.load_state_dict(agent.selection_policy_net.state_dict())
+        agent.selection_memory = ReplayBuffer(10000)
+        agent.selection_optimizer = torch.optim.Adam(agent.selection_policy_net.parameters(), lr=config.learning_rate)
     
     # select using rl based on selection epsilon
     for i in tqdm(range(0, config.n_episodes)):
@@ -79,9 +75,9 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
                 sample = random.random()
                 m = n
                 if sample > agents[n].config.select_epsilon:
-                    agents[n].SelectionPolicyNet.eval()
+                    agents[n].selection_policy_net.eval()
                     s = (h_action[None].to(device), features[None].to(device))
-                    a = int(argmax(agents[n].SelectionPolicyNet(s)))
+                    a = int(argmax(agents[n].selection_policy_net(s)))
                     m = a+1 if a >= n else a
                 else:
                     while m == n:
@@ -91,11 +87,11 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
                 agent1, agent2 = agents[n], agents[m]
                 a1, a2 = agent1.act(agent2), agent2.act(agent1)
                 _, r1, r2 = env.step(a1, a2)
-                update_memory.push(n, m, a1, a2, r1, r2, agent1.State.state, agent2.State.state)
+                update_memory.push(n, m, a1, a2, r1, r2, agent1.state.state, agent2.state.state)
                 # if n ==0 or m == 0:
                 #     print('play')
-                #     print(f'{i}: {n} {agent1.State.state} {a1} {r1} ')
-                #     print(f'{m} {agent2.State.state} {a2} {r2} ')
+                #     print(f'{i}: {n} {agent1.state.state} {a1} {r1} ')
+                #     print(f'{m} {agent2.state.state} {a2} {r2} ')
                 #     input()
             
             # update based on the memory
@@ -114,8 +110,8 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
                 agent2.optimize(a2, r2, agent1, s2)
                 # if me[0] ==0 or me[1] == 0:
                 #     print('optimize')
-                #     print(f'{i}: {me[0]} {s1} {a1} {r1} {agent1.State.next_state}')
-                #     print(f'{me[1]} {s2} {a2} {r2} {agent2.State.next_state}')
+                #     print(f'{i}: {me[0]} {s1} {a1} {r1} {agent1.state.next_state}')
+                #     print(f'{me[1]} {s2} {a2} {r2} {agent2.state.next_state}')
                 #     input()
             
             # process the state and next_state
@@ -139,14 +135,14 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
                 agent1, agent2 = agents[me[0]], agents[me[1]]
                 reward = me[4]
                 action = me[1]-1 if me[1]>me[0] else me[1]
-                agent1.SelectionMemory.push(state, action, reward, next_state)
-                agent1.SelectionPolicyNet.train()
+                agent1.selection_memory.push(state, action, reward, next_state)
+                agent1.selection_policy_net.train()
                 loss = __optimize_model(agent1, n_agents)
                 losses.append(loss) if loss is not None else None
 
                 # update the target network, copying all weights and biases in DQN
                 if agent1.play_times % TARGET_UPDATE == 0:
-                    agent1.SelectionTargetNet.load_state_dict(agent1.SelectionPolicyNet.state_dict())
+                    agent1.selection_target_net.load_state_dict(agent1.selection_policy_net.state_dict())
 
                 # epsilon decay
                 if agent1.config.select_epsilon > agent1.config.min_epsilon:
@@ -157,10 +153,10 @@ def lstm_variant_selection(config: object, agents: dict, env: object):
 def __optimize_model(agent: object, n_agents: int):
     """ Train and optimize our model """
     # don't learn without some decent experience
-    if agent.SelectionMemory.__len__() < BATCH_SIZE:
+    if agent.selection_memory.__len__() < BATCH_SIZE:
         return None
     # random transition batch is taken from experience replay memory
-    transitions = agent.SelectionMemory.sample(BATCH_SIZE)
+    transitions = agent.selection_memory.sample(BATCH_SIZE)
     # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
     state, action, reward, next_state = zip(*transitions)
     # convert to PyTorch and define types
@@ -174,17 +170,7 @@ def __optimize_model(agent: object, n_agents: int):
     action = torch.tensor(action, dtype=torch.int64, device=device)[:, None]  # Need 64 bit to use them as index
     reward = torch.tensor(reward, dtype=torch.float, device=device)[:, None]
     criterion = nn.SmoothL1Loss()  # Compute Huber loss
-    # compute the q value
-    outputs = compute_q_vals(agent.SelectionPolicyNet, state, action)
-    with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
-        target = compute_targets(agent.SelectionTargetNet, reward, next_state, agent.config.discount)
-
-    # loss is measured from error between current and newly expected Q values
-    loss = criterion(outputs, target)
-    # backpropagation of loss to Neural Network (PyTorch magic)
-    agent.SelectionOptimizer.zero_grad()
-    loss.backward()
-    for param in agent.SelectionPolicyNet.parameters():
-        param.grad.data.clamp_(-1,1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
-    agent.SelectionOptimizer.step()
+    batch = Memory.Transition(state, action, next_state, reward)
+    loss = DQN.optimize(agent.selection_policy_net, agent.selection_target_net, agent.selection_optimizer,
+                                      batch, agent.config.discount, criterion)
     return loss.item()

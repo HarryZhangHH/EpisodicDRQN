@@ -1,12 +1,8 @@
-import random
-import sys
 from tqdm import tqdm
-import torch
 import torch.nn as nn
-from collections import namedtuple, deque
 
 from model import NeuralNetwork, LSTM
-from selection.memory import UpdateMemory, ReplayBuffer
+from component.memory import UpdateMemory, ReplayBuffer
 from utils import *
 
 TARGET_UPDATE = 10

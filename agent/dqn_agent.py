@@ -2,8 +2,9 @@ import torch.nn.functional as F
 import torch.nn as nn
 import matplotlib.pyplot as plt
 from agent.abstract_agent import AbstractAgent
-from model import NeuralNetwork
+from model import NeuralNetwork, DQN
 from utils import *
+from component import Memory, ReplayBuffer
 
 MAD_THRESHOLD = 5
 TARGET_UPDATE = 10
@@ -25,20 +26,22 @@ class DQNAgent(AbstractAgent):
         self.name = name
         self.own_memory = torch.zeros((config.n_episodes*10000, ))
         self.opponent_memory = torch.zeros((config.n_episodes*10000, ))
-        self.State = self.StateRepr(method=config.state_repr)
+        self.state = self.StateRepr(method=config.state_repr)
         self.build()
-        self.Policy = self.EpsilonPolicy(self.PolicyNet, config.play_epsilon, config.n_actions)  # an object
-        self.Memory = self.ReplayBuffer(BUFFER_SIZE)  # an object
-        self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
+        self.policy = self.EpsilonPolicy(self.policy_net, config.play_epsilon, config.n_actions)  # an object
+        self.memory = ReplayBuffer(BUFFER_SIZE)  # an object
+        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=self.config.learning_rate)
+        self.criterion = nn.SmoothL1Loss()
         self.loss = []
+        self.model = DQN()
 
     def build(self):
         """State, Policy, Memory, Q are objects"""
         input_size = self.config.h if self.config.state_repr=='uni' else self.config.h*2 if 'bi' in self.config.state_repr else 1
-        self.PolicyNet = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE).to(device) if self.name=='DQN' else None # an object
-        self.TargetNet = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE).to(device) if self.name=='DQN' else None # an object
-        self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
-        print(self.TargetNet.eval())
+        self.policy_net = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE).to(device) if self.name=='DQN' else None # an object
+        self.target_net = NeuralNetwork(input_size, self.config.n_actions, HIDDEN_SIZE).to(device) if self.name=='DQN' else None # an object
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+        print(self.target_net.eval())
         
 
     def act(self, oppo_agent: object):
@@ -58,21 +61,21 @@ class DQNAgent(AbstractAgent):
         own_h_actions = torch.as_tensor(
             self.own_memory[self.play_times - self.config.h: self.play_times])
         if self.play_times >= self.config.h and oppo_agent.play_times >= self.config.h:
-            self.State.state = self.State.state_repr(opponent_h_actions, own_h_actions)
+            self.state.state = self.state.state_repr(opponent_h_actions, own_h_actions)
         else:
-            self.State.state = None
+            self.state.state = None
         return int(self.__select_action())
 
     def __select_action(self):
         """ selection action based on epsilon greedy policy """
-        a = self.Policy.sample_action(self.State.state)
+        a = self.policy.sample_action(self.state.state)
         return a
 
     def update(self, reward: float, own_action: int, opponent_action: int):
         super(DQNAgent, self).update(reward)
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
-        # self.State.oppo_memory = self.opponent_memory[:self.play_times]
+        # self.state.oppo_memory = self.opponent_memory[:self.play_times]
 
     def get_next_state(self,  oppo_agent: object, state: Type.TensorType = None):
         # get next state
@@ -80,24 +83,23 @@ class DQNAgent(AbstractAgent):
             oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
         own_h_actions = torch.as_tensor(
             self.own_memory[self.play_times - self.config.h: self.play_times])
-        self.State.next_state = self.State.state_repr(opponent_h_actions, own_h_actions)
-        self.State.state = self.State.state if state is None else state
+        self.state.next_state = self.state.state_repr(opponent_h_actions, own_h_actions)
+        self.state.state = self.state.state if state is None else state
 
     def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None, flag: bool=True):
         super(DQNAgent, self).optimize(action, reward, oppo_agent)
-        if self.State.state is None:
+        if self.state.state is None:
             return None
 
         self.get_next_state(oppo_agent)
-
         # push the transition into ReplayBuffer
-        self.Memory.push(self.State.state, action, self.State.next_state, reward)
+        self.memory.push(self.state.state, action, self.state.next_state, reward)
 
         if flag:
             self.__optimize_model()
             # Update the target network, copying all weights and biases in DQN
             if self.play_times % TARGET_UPDATE == 0:
-                self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
+                self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def get_batch(self, transitions):
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
@@ -109,33 +111,19 @@ class DQNAgent(AbstractAgent):
         next_state = torch.stack(list(next_state), dim=0).to(device)
         reward = torch.tensor(reward, dtype=torch.float, device=device)[:, None]
         # loss is measured from error between current and newly expected Q values
-        criterion = nn.SmoothL1Loss()
-
-        return criterion, state, action, reward, next_state
+        batch = Memory.Transition(state, action, next_state, reward)
+        return batch
 
     def __optimize_model(self):
         """ Train and optimize our model """
         # don't learn without some decent experience
-        if len(self.Memory.memory) < self.config.batch_size:
+        if len(self.memory.memory) < self.config.batch_size:
             return None
         # random transition batch is taken from experience replay memory
-        transitions = self.Memory.sample(self.config.batch_size)
+        transitions = self.memory.sample(self.config.batch_size)
+        batch = self.get_batch(transitions)
 
-        criterion, state, action, reward, next_state = self.get_batch(transitions)
-
-        # compute the q value
-        q_val = compute_q_vals(self.PolicyNet, state, action)
-        with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
-            target = compute_targets(self.TargetNet, reward, next_state, self.config.discount)
-        loss = criterion(q_val, target)
-
-        # backpropagation of loss to Neural Network (PyTorch magic)
-        self.Optimizer.zero_grad()
-        loss.backward()
-        for param in self.PolicyNet.parameters():
-            param.grad.data.clamp_(-1, 1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
-        self.Optimizer.step()
-        self.loss.append(loss.item())
+        self.model.train(self, batch)
         # test
         # print(f'==================={self.play_times}===================')
         # print(f'transition: \n{np.hstack((state.numpy(),action.numpy(),next_state.numpy(),reward.numpy()))}')
@@ -143,7 +131,15 @@ class DQNAgent(AbstractAgent):
         # print(f'loss: {loss.item()}')
 
     def determine_convergence(self, threshold: int, k: int):
-        return super(DQNAgent, self).determine_convergence(threshold, k)
+        if self.play_times < 2 * k:
+            return False
+        history_1 = self.own_memory[self.play_times - k: self.play_times]
+        history_2 = self.own_memory[self.play_times - 2 * k: self.play_times - k]
+        difference = torch.sum(torch.abs(history_1 - history_2))
+        if difference > threshold:
+            return False
+        else:
+            return True
 
     def show(self):
         print("==================================================")

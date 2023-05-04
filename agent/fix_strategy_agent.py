@@ -1,14 +1,14 @@
 import random
 from agent.abstract_agent import AbstractAgent
 
-class StrategyAgent(AbstractAgent):
+class FixStrategyAgent(AbstractAgent):
     """
     An agent using fixed strategy
     """
 
     def __init__(self, name: str, config: object):
         self.name = name
-        super(StrategyAgent, self).__init__(config)
+        super(FixStrategyAgent, self).__init__(config)
         self.own_memory = []
         self.opponent_memory = []
         self.State = self.StateRepr(method=config.state_repr)
@@ -59,7 +59,7 @@ class StrategyAgent(AbstractAgent):
                 return self.opponent_memory[-1]
 
     def update(self, reward: float, own_action: int, opponent_action: int):
-        super(StrategyAgent, self).update(reward)
+        super(FixStrategyAgent, self).update(reward)
         self.own_memory.append(own_action)
         self.opponent_memory.append(opponent_action)
         self.own_action = own_action
@@ -68,7 +68,7 @@ class StrategyAgent(AbstractAgent):
         return True
 
     def reset(self):
-        super(StrategyAgent, self).reset()
+        super(FixStrategyAgent, self).reset()
         self.own_memory = []
         self.opponent_memory = []
 

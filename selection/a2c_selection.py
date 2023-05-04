@@ -1,12 +1,8 @@
-import sys
 from tqdm import tqdm
-import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 
 from model import FeatureNet, CriticNet, ActorNet
-from selection.memory import ReplayBuffer
+from component.memory import ReplayBuffer
 from utils import *
 
 TARGET_UPDATE = 10

@@ -1,4 +1,4 @@
-from agent.fix_strategy_agent import StrategyAgent
+from agent.fix_strategy_agent import FixStrategyAgent
 from agent.tabluar_agent import TabularAgent
 from agent.dqn_agent import DQNAgent
 from agent.lstm_agent import LSTMAgent

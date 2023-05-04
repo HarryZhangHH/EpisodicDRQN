@@ -8,7 +8,8 @@ parser = argparse.ArgumentParser(description='Playground', prog='Prisoner dilemm
 parser.add_argument('--name', default=None, type=str, help='Name of the run, will be in the output file')
 parser.add_argument('--discount', default=0.99, type=float, help='Reward discount or GAMMA, range:(0,1]')
 parser.add_argument('--n_episodes', default=10000, type=int, help='Number of episodes within a batch')
-parser.add_argument('--h', default=10, type=int, help='state amount')
+parser.add_argument('--h', default=2, type=int, help='Using h previous actions as a state when playing')
+parser.add_argument('--select_h', default=5, type=int, help='Using h previous actions as a state when selecting')
 parser.add_argument('--play_epsilon', default=1, type=float, help='The greedy factor when each agent play the dilemma game')
 parser.add_argument('--select_epsilon', default=1, type=float, help='The greedy factor when each agent select the opponent')
 parser.add_argument('--epsilon_decay', default=0.999, type=float, help='The decay coefficient of epsilon greedy policy of play_epsilon: (new_play_epsilon) = (old_play_epsilon)*epsilon_decay, play_epsilon >= min_epsilon')
@@ -28,7 +29,7 @@ class Config():
     def __init__(self, config: dict):
         self.parse_config(**config)
     
-    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, epsilon_decay, min_epsilon, alpha, n_actions, h, state_repr, batch_size, learning_rate):
+    def parse_config(self, reward, sucker, temptation, punishment, n_episodes, discount, play_epsilon, select_epsilon, epsilon_decay, min_epsilon, alpha, n_actions, h, select_h, state_repr, batch_size, learning_rate):
         # game payoffs
         self.reward = reward
         self.sucker = sucker
@@ -43,6 +44,7 @@ class Config():
         self.alpha = alpha
         self.n_actions = n_actions
         self.h = h
+        self.select_h = select_h
         self.state_repr = state_repr
         self.batch_size = batch_size
         self.learning_rate = learning_rate
@@ -59,7 +61,8 @@ class Config():
             ' select_epsilon=' + str(self.select_epsilon) + \
             ' epsilon_decay=' + str(self.epsilon_decay) + \
             ' state_repr=' + str(self.state_repr) + \
-            ' h=' + str(self.h)
+            ' play_h=' + str(self.h) + \
+            ' select_h=' + str(self.select_h)
 
 
 def main():
@@ -79,6 +82,7 @@ def main():
         'alpha': args.alpha,
         'n_actions': 2,
         'h': args.h,
+        'select_h': args.select_h,
         'state_repr': args.state_repr,
         'batch_size': args.batch_size,
         'learning_rate': args.learning_rate,
@@ -100,18 +104,18 @@ def main():
         # print('here are the strategies, choose one\n', choices)
         # num = int(input('choose a strategy via number '))
         # print('You will use the strategy ' + strategies[num])
-        # simulation.benchmark(strategies, None, config)
+        # simulation.TwoAgentSimulation.benchmark_geometric(strategies, None, config)
 
         print('here are the strategies, choose one\n', rl_choices)
         num = int(input('choose a strategy via number '))
-        simulation.twoSimulateBenchmark(strategies[num], config, episodic_flag=True, sg_flag=False)  # Episodic DQRN
+        simulation.TwoAgentSimulation.benchmark_episodic(strategies[num], config, episodic_flag=True, sg_flag=True)  # Episodic DQRN
         # simulation.twoSimulateBenchmark(strategies[num], config)  # Orignial DQRN
 
 
     if choice == 1:
         print('here are the strategies, choose one\n', choices)
         num = int(input('choose a strategy via number '))
-        simulation.twoSimulate(strategies, num, config)
+        simulation.TwoAgentSimulation.two_simulate(strategies, num, config)
 
     if choice == 2:
         print('right now you are an agent, choice one strategy')
@@ -123,7 +127,7 @@ def main():
         # rounds = int(input('how many rounds do you want to play:'))
         # if rounds > config.n_episodes:
         #     config.n_episodes = rounds
-        simulation.twoSimulate(dict({num1: strategies[num1], num2: strategies[num2]}), num1, num2, config)
+        simulation.TwoAgentSimulation.two_simulate(dict({num1: strategies[num1], num2: strategies[num2]}), num1, num2, config)
 
     if choice == 3:
         simulation.multiAgentSimulate(strategies, config)

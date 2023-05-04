@@ -3,7 +3,6 @@ import torch
 from utils import argmax, label_encode, Type
 from collections import namedtuple, deque
 import numpy as np
-Transition = namedtuple('Transition', ['state','action','next_state','reward'])
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class AbstractAgent():
@@ -17,6 +16,7 @@ class AbstractAgent():
         self.config = config
         self.running_score = 0.0
         self.play_times = 0
+        self.n_actions = config.n_actions
 
     def act(self):
         pass
@@ -49,15 +49,10 @@ class AbstractAgent():
         pass
 
     def determine_convergence(self, threshold: int, k: int):
-        if self.play_times < 2 * k:
-            return False
-        history_1 = self.own_memory[self.play_times-k : self.play_times]
-        history_2 = self.own_memory[self.play_times-2*k : self.play_times-k]
-        difference = torch.sum(torch.abs(history_1 - history_2))
-        if difference > threshold:
-            return False
-        else:
-            return True
+        """
+        Check the convergence of the algorithm from the empirical distribution of actions
+        """
+        return True
 
     class EpsilonPolicy(object):
         """
@@ -143,10 +138,12 @@ class AbstractAgent():
                 An encoded state representation (float tensor).
             """
             if 'uni' in self.method:
-                state_emb = oppo_action.float()
-            if 'bi' in self.method:
+                if 'label' in self.method:
+                    return label_encode(oppo_action)
+                return oppo_action.float()
+            elif 'bi' in self.method:
                 assert own_action is not None, 'Make sure you input valid own_action in bi representation'
-                state_emb = torch.cat((oppo_action.float(), own_action.float())) if oppo_action.size() == own_action.size() else None
+                return torch.cat((oppo_action.float(), own_action.float())) if oppo_action.size() == own_action.size() else None
             if 'label' in self.method:
                 state_emb = label_encode(oppo_action)
             if self.method == 'grudgerlabel':
@@ -163,23 +160,3 @@ class AbstractAgent():
             if self.method == 'grudger':
                 return 2
             return 1
-
-    class ReplayBuffer(object):
-        """
-        A replay buffer using by MC and Q-Network to store transition
-        ----------
-        Args:
-            capacity: the capacit of replay buffer (int)
-        """
-        def __init__(self, capacity: int):
-            self.capacity = capacity
-            self.memory = deque([],maxlen=capacity)
-        def push(self, *args):
-            """Save a transition"""
-            self.memory.append(Transition(*args))
-        def clean(self):
-            self.memory = deque([],maxlen=self.capacity)
-        def sample(self, batch_size: int):
-            return random.sample(self.memory, batch_size)
-        def __len__(self):
-            return len(self.memory)

@@ -1,7 +1,8 @@
 import torch.nn as nn
 from agent.abstract_agent import AbstractAgent
-from model import LSTM, LSTMVariant
+from model import LSTM, LSTMVariant, DQN
 from utils import *
+from component import Memory, ReplayBuffer
 import sys
 
 # Device configuration
@@ -26,29 +27,34 @@ class LSTMAgent(AbstractAgent):
         self.name = name
         self.own_memory = torch.zeros((config.n_episodes*1000, ))
         self.opponent_memory = torch.zeros((config.n_episodes*1000, ))
-        self.State = self.StateRepr(method=config.state_repr)
-        self.build() if 'repr' not in config.state_repr else self.build2()
-        self.Policy = self.EpsilonPolicy(self.PolicyNet, config.play_epsilon, config.n_actions)  # an object
-        self.Memory = self.ReplayBuffer(BUFFER_SIZE)  # an object
-        self.Optimizer = torch.optim.Adam(self.PolicyNet.parameters(), lr=self.config.learning_rate)
+        self.state = self.StateRepr(method=config.state_repr)
+        self.vaiant_flag = True if 'repr' in config.state_repr else False
+        self.feature_size = FEATURE_SIZE
+        self.build() if not self.vaiant_flag else self.build2()
+        self.policy = self.EpsilonPolicy(self.policy_net, config.play_epsilon, self.n_actions)  # an object
+        self.memory = ReplayBuffer(BUFFER_SIZE)  # an object
         self.loss = []
+        self.criterion = nn.CrossEntropyLoss() if self.name=='LSTM' else nn.SmoothL1Loss()
+        self.model = SupervisedLearning() if self.name=='LSTM' else DQN()
 
     def build(self):
         """ Build a normal LSTM network 
         PolicyNet and TargetNet are objects """
         input_size = 2 if self.config.state_repr == 'bi' else 1
-        self.PolicyNet = LSTM(input_size, HIDDEN_SIZE, NUM_LAYER, self.config.n_actions).to(device)
-        self.TargetNet = LSTM(input_size, HIDDEN_SIZE, NUM_LAYER, self.config.n_actions).to(device)
-        self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
-        print(self.TargetNet.eval())
+        self.policy_net = LSTM(input_size, HIDDEN_SIZE, NUM_LAYER, self.n_actions).to(device)
+        self.target_net = LSTM(input_size, HIDDEN_SIZE, NUM_LAYER, self.n_actions).to(device)
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=self.config.learning_rate)
+        print(self.target_net.eval())
     
     def build2(self):
         """ Build a variant LSTM network, an ensemble LSTM and DENSE Network """
         input_size = 2 if 'bi' in self.config.state_repr else 1
-        self.PolicyNet = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE, self.config.n_actions, int(HIDDEN_SIZE/2)).to(device)
-        self.TargetNet = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, FEATURE_SIZE, self.config.n_actions, int(HIDDEN_SIZE/2)).to(device)
-        self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
-        print(self.TargetNet.eval())
+        self.policy_net = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, self.feature_size, self.n_actions, int(HIDDEN_SIZE/2)).to(device)
+        self.target_net = LSTMVariant(input_size, HIDDEN_SIZE, NUM_LAYER, self.feature_size, self.n_actions, int(HIDDEN_SIZE/2)).to(device)
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=self.config.learning_rate)
+        print(self.target_net.eval())
 
         
     def act(self, oppo_agent: object):
@@ -69,19 +75,19 @@ class LSTMAgent(AbstractAgent):
             self.own_memory[self.play_times - self.config.h: self.play_times])
         
         if self.play_times >= self.config.h and oppo_agent.play_times >= self.config.h:
-            self.State.state = self.State.state_repr(opponent_h_actions, own_h_actions)
-            self.State.state = torch.permute(self.State.state.view(-1, self.config.h), (1, 0)) # important
+            self.state.state = self.state.state_repr(opponent_h_actions, own_h_actions)
+            self.state.state = torch.permute(self.state.state.view(-1, self.config.h), (1, 0)) # important
 
-            if 'repr' in self.config.state_repr:
+            if self.vaiant_flag:
                 feature = self.generate_feature(oppo_agent)
-                self.State.state = (self.State.state, feature)
+                self.state.state = (self.state.state, feature)
         else:
-            self.State.state = None
+            self.state.state = None
         return int(self.__select_action())
 
     def __select_action(self):
         """selection action based on epsilon greedy policy """
-        a = self.Policy.sample_action(self.State.state)
+        a = self.policy.sample_action(self.state.state)
         return a
 
     def generate_feature(self, oppo_agent: object):
@@ -100,7 +106,7 @@ class LSTMAgent(AbstractAgent):
         oppo_reward_ratio = oppo_reward/max_reward
         own_play_times_ratio = min(1, self.play_times/(self.config.n_episodes*5))
         oppo_play_times_ratio = min(1, oppo_agent.play_times/(self.config.n_episodes*5))
-        if FEATURE_SIZE == 4:
+        if self.feature_size == 4:
             return torch.FloatTensor([own_reward_ratio, own_defect_ratio, oppo_reward_ratio, oppo_defect_ratio])
         else:
             return torch.FloatTensor([own_reward_ratio, own_defect_ratio, own_faced_defect_ratio, own_play_times_ratio,
@@ -110,7 +116,7 @@ class LSTMAgent(AbstractAgent):
         super(LSTMAgent, self).update(reward)
         self.own_memory[self.play_times - 1] = own_action
         self.opponent_memory[self.play_times - 1] = opponent_action
-        # self.State.oppo_memory = self.opponent_memory[:self.play_times]
+        # self.state.oppo_memory = self.opponent_memory[:self.play_times]
 
     def get_next_state(self,  oppo_agent: object, state: Type.TensorType = None):
         # get opponent's last h move
@@ -118,17 +124,17 @@ class LSTMAgent(AbstractAgent):
             oppo_agent.own_memory[oppo_agent.play_times - self.config.h: oppo_agent.play_times])
         own_h_actions = torch.as_tensor(
             self.own_memory[self.play_times - self.config.h: self.play_times])
-        self.State.next_state = self.State.state_repr(opponent_h_actions, own_h_actions)
-        self.State.next_state = torch.permute(self.State.next_state.view(-1, self.config.h), (1, 0))  # important
-        if 'repr' in self.config.state_repr:
+        self.state.next_state = self.state.state_repr(opponent_h_actions, own_h_actions)
+        self.state.next_state = torch.permute(self.state.next_state.view(-1, self.config.h), (1, 0))  # important
+        if self.vaiant_flag:
             feature = self.generate_feature(oppo_agent)
-            self.State.next_state = (self.State.next_state.numpy(), feature.numpy())
-            self.State.state = (self.State.state[0].numpy(), self.State.state[1].numpy()) if state is None else (state[0].numpy(), state[1].numpy())
+            self.state.next_state = (self.state.next_state.numpy(), feature.numpy())
+            self.state.state = (self.state.state[0].numpy(), self.state.state[1].numpy()) if state is None else (state[0].numpy(), state[1].numpy())
 
-    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None, flag: bool=True):
+    def optimize(self, action: int, reward: float, oppo_agent: object, state: Type.TensorType = None, flag: bool = True):
         """ push the trajectoriy into the ReplayBuffer and optimize the model """
         super(LSTMAgent, self).optimize(action, reward, oppo_agent)
-        if self.State.state is None:
+        if self.state.state is None:
             return None
 
         # get opponent's last h move
@@ -136,36 +142,34 @@ class LSTMAgent(AbstractAgent):
 
         # push the transition into ReplayBuffer
         if self.name == 'LSTM':
-            self.Memory.push(self.State.state, action, int(oppo_agent.own_memory[oppo_agent.play_times - 1]), reward)
+            self.memory.push(self.state.state, action, int(oppo_agent.own_memory[oppo_agent.play_times - 1]), reward)
         if self.name == 'LSTMQN':
-            self.Memory.push(self.State.state, action, self.State.next_state, reward)
+            self.memory.push(self.state.state, action, self.state.next_state, reward)
 
         if flag:
             # print(f'Episode {self.play_times}:  {own_action}, {opponent_action}') if self.play_times > self.config.batch_size else None
             self.__optimize_model()
-            self.Policy.update_epsilon(self.config)
+            self.policy.update_epsilon(self.config)
             # Update the target network, copying all weights and biases in DQN
             if self.play_times % TARGET_UPDATE == 0:
-                self.TargetNet.load_state_dict(self.PolicyNet.state_dict())
+                self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def get_batch(self, transitions):
         # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
         state, action, next_state, reward = zip(*transitions)
-        criterion = None
         # convert to PyTorch and define types
         if self.name == 'LSTM':
-            if 'repr' in self.config.state_repr:
+            if self.vaiant_flag:
                 h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:, 0]).astype(np.float)).to(
                     device).view(self.config.batch_size, self.config.h, -1)
                 features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:, 1]).astype(np.float)).to(
-                    device).view(self.config.batch_size, FEATURE_SIZE)
+                    device).view(self.config.batch_size, self.feature_size)
                 state = (h_action, features)
             else:
                 state = torch.stack(list(state), dim=0).view(self.config.batch_size, self.config.h, -1).to(device)
-            criterion = nn.CrossEntropyLoss()
 
         elif self.name == 'LSTMQN':
-            if 'repr' in self.config.state_repr:
+            if self.vaiant_flag:
                 # test
                 # print(np.array(state, dtype=object)[:,0])
                 # print(np.vstack(np.array(state, dtype=object)[:,0]))
@@ -175,12 +179,12 @@ class LSTMAgent(AbstractAgent):
                 h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:, 0]).astype(np.float)).view(
                     self.config.batch_size, self.config.h, -1).to(device)
                 features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:, 1]).astype(np.float)).view(
-                    self.config.batch_size, FEATURE_SIZE).to(device)
+                    self.config.batch_size, self.feature_size).to(device)
                 state = (h_action, features)
                 h_action = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:, 0]).astype(np.float)).view(
                     self.config.batch_size, self.config.h, -1).to(device)
                 features = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:, 1]).astype(np.float)).view(
-                    self.config.batch_size, FEATURE_SIZE).to(device)
+                    self.config.batch_size, self.feature_size).to(device)
                 next_state = (h_action, features)
             else:
                 state = torch.stack(list(state), dim=0).view(self.config.batch_size, self.config.h, -1).to(device)
@@ -188,38 +192,22 @@ class LSTMAgent(AbstractAgent):
                     device)
             action = torch.tensor(action, dtype=torch.int64, device=device)[:, None]  # Need 64 bit to use them as index
             reward = torch.tensor(reward, dtype=torch.float, device=device)[:, None]
-            criterion = nn.SmoothL1Loss()
 
-        return criterion, state, action, reward, next_state
+        batch = Memory.Transition(state, action, next_state, reward)
+        return batch
 
     def __optimize_model(self):
         """ Train and optimize our model """
         # don't learn without some decent experience
-        if len(self.Memory.memory) < self.config.batch_size:
+        if len(self.memory.memory) < self.config.batch_size:
             return None
         # random transition batch is taken from experience replay memory
-        transitions = self.Memory.sample(self.config.batch_size)
+        transitions = self.memory.sample(self.config.batch_size)
 
-        criterion, state, action, reward, next_state = self.get_batch(transitions)
+        batch = self.get_batch(transitions)
 
-        if self.name == 'LSTM':
-            target = torch.tensor(next_state, dtype=torch.int64, device=device)
-            outputs = self.PolicyNet(state)
-        elif self.name == 'LSTMQN':
-            # compute the q value
-            outputs = compute_q_vals(self.PolicyNet, state, action)
-            with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
-                target = compute_targets(self.TargetNet, reward, next_state, self.config.discount)
-        # loss is measured from error between current and newly expected Q values
-        loss = criterion(outputs, target)
+        self.model.train(self, batch)
 
-        # backpropagation of loss to Neural Network (PyTorch magic)
-        self.Optimizer.zero_grad()
-        loss.backward()
-        for param in self.PolicyNet.parameters():
-            param.grad.data.clamp_(-1, 1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
-        self.Optimizer.step()
-        self.loss.append(loss.item())
         # test
         # print(f'==================={self.play_times}===================')
         # print(f'transition: \n{np.hstack((state.numpy(),action.numpy(),next_state.numpy(),reward.numpy()))}')
@@ -227,9 +215,32 @@ class LSTMAgent(AbstractAgent):
         # print(f'loss: {loss.item()}')
 
     def determine_convergence(self, threshold: int, k: int):
-        return super(LSTMAgent, self).determine_convergence(threshold, k)
+        if self.play_times < 2 * k:
+            return False
+        history_1 = self.own_memory[self.play_times - k: self.play_times]
+        history_2 = self.own_memory[self.play_times - 2 * k: self.play_times - k]
+        difference = torch.sum(torch.abs(history_1 - history_2))
+        if difference > threshold:
+            return False
+        else:
+            return True
 
     def show(self):
         print("==================================================")
         print(f'Your action: {self.own_memory[self.play_times-20:self.play_times]}\nOppo action: {self.opponent_memory[self.play_times-20:self.play_times]}')
 
+class SupervisedLearning(object):
+    @staticmethod
+    def train(agent: object, batch: object):
+        target = torch.tensor(batch.next_state, dtype=torch.int64, device=device)
+        outputs = agent.policy_net(batch.state)
+        loss = agent.criterion(outputs, target)
+
+        # backpropagation of loss to Neural Network (PyTorch magic)
+        agent.optimizer.zero_grad()
+        loss.backward()
+        for param in agent.policy_net.parameters():
+            param.grad.data.clamp_(-1,
+                                   1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
+        agent.optimizer.step()
+        agent.loss.append(loss.item())

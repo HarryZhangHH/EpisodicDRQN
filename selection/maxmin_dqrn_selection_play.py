@@ -1,13 +1,10 @@
-import random
-import sys
 from tqdm import tqdm
-import torch
 import copy
 import torch.nn as nn
-from collections import namedtuple, deque
 
 from model import LSTMVariant
-from selection.memory import UpdateMemory, ReplayBuffer, SettlementMemory
+from env import Environment, StochasticGameEnvironment
+from component.memory import ReplayBuffer, SettlementMemory
 from utils import *
 
 TARGET_UPDATE = 10
@@ -20,19 +17,43 @@ SETTLEMENT_PROB = 0.005
 UPDATE_TIMES = 10
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def maxmin_dqrn_selection_play(config: object, agents: dict, env: object):
+def maxmin_dqrn_selection_play(config: object, agents: dict[int, object], thresh:int = 1000, episodic_flag: bool = False, sg_flag: bool = True):
+    """
+    Maxmin-DQRN selection method - using LSTM or ensemble LSTM (LSTM-VARIANT)
+
+    Parameters
+    ----------
+    config: object
+    agents: dict[object]
+        dictionary of n unupdated agents
+    thresh: int
+        threshold of the convergence criteria and the length pf the state test set
+    episodic_flag: bool
+        whether using episodic learning mechanism or not
+    sg_flag: bool
+        stochastic game or repeated game
+
+    Returns
+    -------
+    agents: dict[object]
+        dictionary of n updated agents
+    """
 
     def map_action(a: int):
         # C: 0 -> 1; D: 1 -> -1
         return a*(-2)+1
 
+    env = Environment(config) if not sg_flag else StochasticGameEnvironment(config)
+
     n_agents = len(agents)
+    select_h = config.select_h
     select_dict = {}
     selected_dict = {}
+    test_q_dict = {}
     for n in range(n_agents):
         select_dict[n] = 0
         selected_dict[n] = 0
-
+        test_q_dict[n] = {}
 
     initialize_agent_configuration(agents)
 
@@ -41,18 +62,20 @@ def maxmin_dqrn_selection_play(config: object, agents: dict, env: object):
 
     # select using rl based on selection epsilon
     for i in tqdm(range(0, config.n_episodes)):
-        society_reward = 0
 
         # check the settlement state
         sample = random.random()
-        if sample < SETTLEMENT_PROB:
-            # print(f'======= Episode: {i} SETTLEMENT =======')
+        if episodic_flag:
+            if sample < SETTLEMENT_PROB:
+                # print(f'======= Episode: {i} SETTLEMENT =======')
+                __optimize_play_model(agents, settlement_memory)
+                for n in agents:
+                    agents[n].SelectionMemory.clean()
+                settlement_memory.clean()
+                beliefs = np.clip(beliefs, -1, 1)   # clip belief into [-1,1]
+                continue
+        else:
             __optimize_play_model(agents, settlement_memory)
-            for n in agents:
-                agents[n].SelectionMemory.clean()
-            settlement_memory.clean()
-            beliefs = np.clip(beliefs, -1, 1)   # clip belief into [-1,1]
-            continue
 
         # check state: (h_action, features)
         while True:
@@ -60,8 +83,8 @@ def maxmin_dqrn_selection_play(config: object, agents: dict, env: object):
             for n in agents:
                 agent = agents[n]
                 t = agent.play_times
-                if t >= config.h:
-                    h_action.append(torch.as_tensor(agent.own_memory[t - config.h: t], dtype=torch.float))
+                if t >= select_h:
+                    h_action.append(torch.as_tensor(agent.own_memory[t - select_h: t], dtype=torch.float))
                 else:
                     break
             if len(h_action) != n_agents:
@@ -104,7 +127,7 @@ def maxmin_dqrn_selection_play(config: object, agents: dict, env: object):
         # play
         agent1, agent2 = agents[n], agents[m]
         a1, a2, r1, r2 = play(agent1, agent2, env)
-        society_reward = society_reward + r1 + r2
+        env.update(r1 + r2)
 
         # update beliefs
         beliefs[n] = beliefs[n] + config.learning_rate * map_action(int(a1))
@@ -114,6 +137,7 @@ def maxmin_dqrn_selection_play(config: object, agents: dict, env: object):
         agent2.get_next_state(agent1)
 
         settlement_memory.push(n, m, a1, a2, r1, r2, agent1.State.state, agent2.State.state, agent1.State.next_state, agent2.State.next_state)
+        # print(n,m,a1,a2,r1,r2) if n==2 else None
 
         # process the state, action, reward and next_state
         state = (h_action.numpy(), features.numpy())
@@ -121,8 +145,8 @@ def maxmin_dqrn_selection_play(config: object, agents: dict, env: object):
         for idx in agents:
             agent = agents[idx]
             t = agent.play_times
-            if t >= config.h:
-                h_action.append(torch.as_tensor(agent.own_memory[t - config.h: t], dtype=torch.float))
+            if t >= select_h:
+                h_action.append(torch.as_tensor(agent.own_memory[t - select_h: t], dtype=torch.float))
         h_action = torch.stack(h_action, dim=0)
         h_action = h_action.T
         features = torch.from_numpy(beliefs)
@@ -178,6 +202,11 @@ def play(agent1: object, agent2: object, env:object):
         a1 = get_action_selection_q_values(agent1, agent1.State.state)
         a2 = get_action_selection_q_values(agent2, agent2.State.state)
 
+    # check the SG state
+    agents = {}
+    agents[0], agents[1] = agent1, agent2
+    env.update_state(agents)
+
     _, r1, r2 = env.step(a1, a2)
     agent1.update(r1, a1, a2)
     agent2.update(r2, a2, a1)
@@ -193,10 +222,10 @@ def __optimize_selection_model(agent: object, n_agents: int):
     # transition is a list of 4-tuples, instead we want 4 vectors (as torch.Tensor's)
     state, action, reward, next_state = zip(*transitions)
     # convert to PyTorch and define types
-    h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).view(BATCH_SIZE, agent.config.h, n_agents).to(device)
+    h_action = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,0]).astype(np.float)).view(BATCH_SIZE, agent.config.select_h, n_agents).to(device)
     features = torch.from_numpy(np.vstack(np.array(state, dtype=object)[:,1]).astype(np.float)).view(BATCH_SIZE, max(1,FEATURE_SIZE)*n_agents).to(device)
     state = (h_action, features)
-    h_action = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,0]).astype(np.float)).view(BATCH_SIZE, agent.config.h, n_agents).to(device)
+    h_action = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,0]).astype(np.float)).view(BATCH_SIZE, agent.config.select_h, n_agents).to(device)
     features = torch.from_numpy(np.vstack(np.array(next_state, dtype=object)[:,1]).astype(np.float)).view(BATCH_SIZE, max(1,FEATURE_SIZE)*n_agents).to(device)
     next_state = (h_action, features)
 
@@ -286,6 +315,7 @@ def __optimize_play_model(agents:dict, settlement_memory:object):
 
     # clean the play_buffer
     for n in agents:
+        agent = agents[n]
         for m in agent.play_memory:
             agent.play_memory[m].clean()
 
