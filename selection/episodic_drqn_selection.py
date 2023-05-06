@@ -99,7 +99,7 @@ def episodic_drqn_selection(config: object, agents: dict, k:int = 1000, episodic
     return agents, select_dict, selected_dict, authority.beliefs, count, convergent_episode_dict
 
 class CentralAuthority():
-    def __init__(self, config: object, agents: dict[int, object], k: int, episodic_flag: bool = True, sg_flag: bool = False, settlement_prob: float = 0.005, select_epsilon_decay: float = 0.999, update_times: int = 10, select_method: str = 'DQN'):
+    def __init__(self, config: object, agents: dict[int, object], k: int, episodic_flag: bool = True, sg_flag: bool = False, settlement_prob: float = 0.005, select_epsilon_decay: float = 0.999, update_times: int = 20, select_method: str = 'DQN'):
         self.config = config
         self.n_agents = len(agents)
         self.k = k
@@ -272,38 +272,38 @@ class CentralAuthority():
 
             # update beliefs
             self.update_belief(n, m, a1, a2)
+            if len(self.agents) > 2:
+                # process the state, action, reward and next_state
+                state = (h_action.numpy(), features.numpy())
+                h_action = []
+                for idx in self.agents:
+                    agent = self.agents[idx]
+                    t = agent.play_times
+                    if t >= self.select_h:
+                        h_action.append(torch.as_tensor(agent.own_memory[t - self.select_h: t], dtype=torch.float))
+                h_action = torch.stack(h_action, dim=0)
+                h_action = h_action.T
+                features = torch.from_numpy(self.beliefs)
+                next_state = (h_action.numpy(), features.numpy())
+                action = m - 1 if m > n else m
+                reward = r1
 
-            # process the state, action, reward and next_state
-            state = (h_action.numpy(), features.numpy())
-            h_action = []
-            for idx in self.agents:
-                agent = self.agents[idx]
-                t = agent.play_times
-                if t >= self.select_h:
-                    h_action.append(torch.as_tensor(agent.own_memory[t - self.select_h: t], dtype=torch.float))
-            h_action = torch.stack(h_action, dim=0)
-            h_action = h_action.T
-            features = torch.from_numpy(self.beliefs)
-            next_state = (h_action.numpy(), features.numpy())
-            action = m - 1 if m > n else m
-            reward = r1
+                # push trajectories into Selection ReplayBuffer(Memory) and optimize the model
+                agent1.selection_memory.push(state, action, reward, next_state)
+                self.record_memory.push(n, m, state, a1, a2, r1, r2)
+                agent1.selection_policy_net.train()
+                loss = self.__optimize_selection_model(agent1)
+                self.selection_loss_dict[n].append(loss) if loss is not None else None
 
-            # push trajectories into Selection ReplayBuffer(Memory) and optimize the model
-            agent1.selection_memory.push(state, action, reward, next_state)
-            self.record_memory.push(n, m, state, a1, a2, r1, r2)
-            agent1.selection_policy_net.train()
-            loss = self.__optimize_selection_model(agent1)
-            self.selection_loss_dict[n].append(loss) if loss is not None else None
+                # update the target network, copying all weights and biases in DRQN
+                if agent1.play_times % TARGET_UPDATE == 0:
+                    agent1.selection_target_net.load_state_dict(agent1.selection_policy_net.state_dict())
 
-            # update the target network, copying all weights and biases in DRQN
-            if agent1.play_times % TARGET_UPDATE == 0:
-                agent1.selection_target_net.load_state_dict(agent1.selection_policy_net.state_dict())
-
-            # selection policy epsilon decay
-            if agent1.config.select_epsilon > agent1.config.min_epsilon:
-                agent1.config.select_epsilon *= self.select_epsilon_decay
-            if agent1.config.select_epsilon <= agent1.config.min_epsilon:
-                agent1.config.select_epsilon = agent1.config.min_epsilon
+                # selection policy epsilon decay
+                if agent1.config.select_epsilon > agent1.config.min_epsilon:
+                    agent1.config.select_epsilon *= self.select_epsilon_decay
+                if agent1.config.select_epsilon <= agent1.config.min_epsilon:
+                    agent1.config.select_epsilon = agent1.config.min_epsilon
 
         return select_dict, selected_dict
 
