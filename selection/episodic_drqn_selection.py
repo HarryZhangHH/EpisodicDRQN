@@ -91,7 +91,9 @@ def episodic_drqn_selection(config: object, agents: dict, k:int = 1000, episodic
         converge = []
         for key, _ in convergent_episode_dict.items():
             converge.append(len(convergent_episode_dict[key]) == len(agents))
-        if sum(converge) == 3:
+        if sum(converge) >= 2:
+            for n in agents:
+                print(f'Agent {n} updating times: {agents[n].updating_times}')
             break
 
     return agents, select_dict, selected_dict, authority.beliefs, count, convergent_episode_dict
@@ -139,6 +141,7 @@ class CentralAuthority():
             agent.selection_optimizer = torch.optim.Adam(agent.selection_policy_net.parameters(),
                                                         lr=self.selection_learning_rate)
             agent.selection_target_net.eval()
+            agent.updating_times = {}
 
             # for name, param in agent.selection_policy_net.named_parameters():
             #     print(name, param.data)
@@ -190,7 +193,7 @@ class CentralAuthority():
         for n in self.agents:
             self.selection_loss_dict[n] = []
         # select using rl based on selection epsilon
-        for i in tqdm(range(0, self.k)):
+        for i in range(0, self.k):
             # check the settlement state
             self.check_state()
             if self.state==-1 and self.episodic_flag:
@@ -339,6 +342,7 @@ class CentralAuthority():
             # check fix strategy
             if s1 is not None and next_s1 is not None:
                 if m not in agent1.play_memory_dict.keys():
+                    agent1.updating_times[m] = 0
                     agent1.play_loss_dict[m] = []
                     agent1.play_memory_dict[m] = ReplayBuffer(BUFFER_SIZE)
                     agent1.play_policy_net_dict[m] = copy.deepcopy(agent1.policy_net)
@@ -351,6 +355,7 @@ class CentralAuthority():
 
             if s2 is not None and next_s2 is not None:
                 if n not in agent2.play_memory_dict.keys():
+                    agent2.updating_times[n] = 0
                     agent2.play_loss_dict[n] = []
                     agent2.play_memory_dict[n] = ReplayBuffer(BUFFER_SIZE)
                     agent2.play_policy_net_dict[n] = copy.deepcopy(agent2.policy_net)
@@ -371,6 +376,8 @@ class CentralAuthority():
                 if len(agent.play_memory_dict[m].memory) < agent.config.batch_size:
                     continue
                 else:
+                    # if self.episodic_flag:
+                    #     self.update_times = len(agent.play_memory_dict[m].memory)-agent.config.batch_size
                     for _ in range(self.update_times):
                         # random transition batch is taken from experience replay memory
                         transitions = agent.play_memory_dict[m].sample(agent.config.batch_size)
@@ -381,6 +388,7 @@ class CentralAuthority():
                         agent.play_loss_dict[m].append(loss.item())
                         # update play_epsilon
                         agent.policy.update_epsilon(agent.config)
+                        agent.updating_times[m] += 1
 
 def check_convergence(agents: dict[int, object], test_state: Type.TensorType, thresh: tuple, k: int, last_reward: dict[int, float], test_q_dict: dict, count: int):
     strategy_convergent_episode = {}

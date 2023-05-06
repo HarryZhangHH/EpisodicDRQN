@@ -25,8 +25,6 @@ class Environment():
             a1, a2 = agent1.act(agent2), agent2.act(agent1)
             _, r1, r2 = self.step(a1, a2)
             self.optimize(agent1, agent2, a1, a2, r1, r2)
-            # agent1.Policy.update_epsilon(self.config)
-            # agent2.Policy.update_epsilon(self.config)
         return r1, r2
 
     def optimize(self, agent1: object, agent2: object, a1: int, a2: int, r1: float, r2: float, flag: bool = True):
@@ -68,6 +66,8 @@ class Environment():
         self.episode = 0
         self.running_score = 0.0
 
+    def reset_state(self):
+        pass
 
 class StochasticGameEnvironment(Environment):
     """
@@ -96,13 +96,13 @@ class StochasticGameEnvironment(Environment):
         print('======= Initialize the environment: Stochastic Game =======')
 
     @staticmethod
-    def check_state(agents: dict):
-        state = 1
+    def check_state(agents: dict, thresh: int = 2):
+        state = 0
         for n in agents:
-            if agents[n].play_times < agents[n].config.h:
+            if agents[n].play_times < thresh:
                 return 1
             else:
-                state += sum(agents[n].own_memory[agents[n].play_times-agents[n].config.h:agents[n].play_times])
+                state += sum(agents[n].own_memory[agents[n].play_times-thresh : agents[n].play_times])
         return state
 
     def optimize(self, agent1: object, agent2: object, a1: int, a2: int, r1: float, r2: float, flag: bool = True):
@@ -110,7 +110,7 @@ class StochasticGameEnvironment(Environment):
         agents = {}
         agents[0], agents[1] = agent1, agent2
         self.update_state(agents)
-        # print(f'game:{self.s}') if self.s == 0 else None
+        print(f'game:{self.s}') if self.s == 0 else None
 
     def update_state(self, agents: dict):
         s = self.check_state(agents)
@@ -150,12 +150,11 @@ class StochasticGameEnvironment(Environment):
                 r1, r2 = self.config.reward, self.config.sucker
             elif a1 == 1 and a2 == 1:
                 r1, r2 = self.config.punishment, self.config.punishment
-
         return episode, r1, r2
 
     def reset(self):
         super(StochasticGameEnvironment, self).reset()
-        self.s = 1
+        self.reset_state()
 
     def reset_state(self):
         self.s = 1

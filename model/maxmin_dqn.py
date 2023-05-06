@@ -33,6 +33,7 @@ class MaxminDQN(DQN):
         with torch.no_grad():  # Don't compute gradient info for the target (semi-gradient)
             target = MaxminDQN.compute_targets(target_net_dict, reward, next_state, discount)
         loss = criterion(q_val, target)
+        # print(action[:5],reward[:5],q_val[:5],target[:5],loss)
 
         # backpropagation of loss to Neural Network (PyTorch magic)
         optimizer.zero_grad()

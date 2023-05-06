@@ -83,7 +83,7 @@ class TwoAgentSimulation():
         return q_table_list
 
     @staticmethod
-    def benchmark_episodic(name: str, config: object, thresh: int = 1000, episodic_flag: bool = True, sg_flag: bool = False, method: str = 'DQN', lr_scale: float = 0):
+    def benchmark_episodic(name: str, config: object, thresh: int = 1000, episodic_flag: bool = True, sg_flag: bool = True, method: str = 'DDQN', lr_scale: float = 0):
         """
             Two-agent simulation benchmark: Learning Agent vs Fix Agent (Random)
             Parameters
@@ -201,10 +201,11 @@ class TwoAgentSimulation():
     @staticmethod
     def two_simulate(strategies: dict[int, str], num1: int, num2:int, config: object, delta: float = 0.0001, k: int = 1000):
         converge_flag = False
-        alter_flag = True # alternate learning
+        alter_flag = False # alternate learning
         seed_everything()
         if num1 >= 7 or num2 >= 7:
             converge_flag = question('Do you want to set the episode to infinity and it will stop automatically when policy converges')
+            alter_flag = question('Do you want to apply alternative learning?')
         env = Environment(config)
         print("--------------------------------------------------------------------- GAME ---------------------------------------------------------------------")
         print('You will use the strategy ' + strategies[num1])
@@ -266,16 +267,16 @@ class TwoAgentSimulation():
         print("------------------------------------------------------------------------------------------------------------------------------------------------")
         print()
 
-        x = [i for i in range(0, agent1.play_times)]
-        plt.figure(figsize=(20, 10))
-        plt.plot(x, agent1.own_memory[0:agent1.play_times], label=agent1.name, alpha=0.5)
-        plt.plot(x, agent2.own_memory[0:agent2.play_times], label=agent2.name, alpha=0.5)
-        plt.legend()
-        plt.ylim(-0.5, 2)
-        plt.xlim(0, agent1.play_times)
-        plt.title(f'agent:{agent1.name} vs agent:{agent2.name}')
-        plt.savefig(f'images/{agent1.name}vs{agent2.name}_result_h={config.h}.png')
-        plt.show()
+        # x = [i for i in range(0, agent1.play_times)]
+        # plt.figure(figsize=(20, 10))
+        # plt.plot(x, agent1.own_memory[0:agent1.play_times], label=agent1.name, alpha=0.5)
+        # plt.plot(x, agent2.own_memory[0:agent2.play_times], label=agent2.name, alpha=0.5)
+        # plt.legend()
+        # plt.ylim(-0.5, 2)
+        # plt.xlim(0, agent1.play_times)
+        # plt.title(f'agent:{agent1.name} vs agent:{agent2.name}')
+        # plt.savefig(f'images/{agent1.name}vs{agent2.name}_result_h={config.h}.png')
+        # plt.show()
 
         # print(agent1.Policy_net(torch.tensor([1], dtype=torch.float, device='cpu')), agent1.Policy_net(torch.tensor([0], dtype=torch.float, device='cpu')))
         # if agent2.name == 'DQN':
@@ -301,7 +302,7 @@ class TwoAgentSimulation():
                     agent2.optimizer = torch.optim.Adam(agent2.policy_net.parameters(), lr=config.learning_rate)
             a1, a2 = agent1.act(agent2), agent2.act(agent1)
             _, r1, r2 = env.step(a1, a2)
-            env.optimize(agent1, agent2, a1, a2, r1, r2, flag=False)
+            env.optimize(agent1, agent2, a1, a2, r1, r2, flag=True)
 
             if i // transition_episode % 2 == 0:
                 # agent 1 learns (high learning rate)
@@ -399,12 +400,16 @@ def multiAgentSimulate(strategies: dict, config: object, selection_method: str =
 
     # show result
     for n in range(len(agents)):
+        agents[n].show()
+
+    for n in range(len(agents)):
         print('Agent{}: name:{}  final score:{}  play time:{}  times to play D:{}  ratio: {}  faced D ratio: {}'
               .format(n, agents[n].name, agents[n].running_score,
                       len(agents[n].own_memory[:agents[n].play_times]),
                       list(agents[n].own_memory[:agents[n].play_times]).count(1),
                       list(agents[n].own_memory[:agents[n].play_times]).count(1) / len(agents[n].own_memory[:agents[n].play_times]),
                       list(agents[n].opponent_memory[:agents[n].play_times]).count(1) / len(agents[n].opponent_memory[:agents[n].play_times])))
+
     print('The reward for total society: {}'.format(env.running_score / len(agents)))
 
     # plt.figure(figsize=(20, 10))
