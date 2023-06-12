@@ -7,7 +7,7 @@ import sys
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-TARGET_UPDATE = 100
+TARGET_UPDATE = 10
 HIDDEN_SIZE = 128
 FEATURE_SIZE = 4
 BUFFER_SIZE = 1000
@@ -17,11 +17,22 @@ class LSTMAgent(AbstractAgent):
     # h is every agents' most recent h actions are visiable to others which is composed to state
     def __init__(self, name: str, config: object):
         """
+        Initialize an Agent object.
 
-        Parameters
-        ----------
-        config: object
-        name : str = LSTM or LSTMQN
+        Params
+        ======
+            state_size (int): dimension of each state
+            action_size (int): dimension of each action
+            Network (str): dqn network type
+            layer_size (int): size of the hidden layer
+            BATCH_SIZE (int): size of the training batch
+            BUFFER_SIZE (int): size of the replay memory
+            LR (float): learning rate
+            TAU (float): tau for soft updating the network weights
+            GAMMA (float): discount factor
+            UPDATE_EVERY (int): update frequency
+            device (str): device that is used for the compute
+            seed (int): random seed
         """
         super(LSTMAgent, self).__init__(config)
         self.name = name

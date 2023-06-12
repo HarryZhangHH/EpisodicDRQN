@@ -1,14 +1,9 @@
-import torch
-import random
-import numpy as np
-import matplotlib.pyplot as plt
 from agent import *
 from selection import *
 from utils import *
-from env import Environment, StochasticGameEnvironment
+from component.env import Environment, StochasticGameEnvironment
 from model import DQN, DDQN
-from component import *
-import sys
+
 
 def construct_agent(name: str, config: object):
     if name == 'A2CLSTM':
@@ -83,7 +78,7 @@ class TwoAgentSimulation():
         return q_table_list
 
     @staticmethod
-    def benchmark_episodic(name: str, config: object, thresh: int = 1000, episodic_flag: bool = True, sg_flag: bool = True, method: str = 'DDQN', lr_scale: float = 0):
+    def benchmark_episodic(name: str, config: object, thresh: int = 1000, episodic_flag: bool = True, sg_flag: bool = True, method: str = 'DQN', lr_scale: float = 0):
         """
             Two-agent simulation benchmark: Learning Agent vs Fix Agent (Random)
             Parameters
@@ -336,10 +331,10 @@ def multiAgentSimulate(strategies: dict, config: object, selection_method: str =
     # creating an empty list
     lst = []
     lst.append(int(input("Enter number of fix strategy agents : ")))
-    lst.append(int(input("Enter number of tabular q-learning agents : ")))
     lst.append(int(input("Enter number of dqn agents : ")))
-    lst.append(int(input("Enter number of lstm-predict agents : ")))
-    lst.append(int(input("Enter number of lstmqn agents : ")))
+    lst.append(int(input("Enter number of drqn agents : ")))
+    # lst.append(int(input("Enter number of tabular q-learning agents : ")))
+    # lst.append(int(input("Enter number of lstm-predict agents : ")))
     # lst.append(int(input("Enter number of a2c agents : ")))
     # lst.append(int(input("Enter number of a2c-lstm agents : ")))
 
@@ -355,13 +350,14 @@ def multiAgentSimulate(strategies: dict, config: object, selection_method: str =
                     agents[index] = construct_agent(strategies[random.randint(0, 6)], config)  # Fix strategy
                     # agents[index] = construct_agent('TitForTat', config)
                 if idx == 1:
-                    agents[index] = construct_agent('QLearning', config)
-                if idx == 2:
                     agents[index] = construct_agent('DQN', config)
-                if idx == 3:
-                    agents[index] = construct_agent('LSTM', config)
-                if idx == 4:
+                if idx == 2:
                     agents[index] = construct_agent('LSTMQN', config)
+                # if idx == 3:
+                #     agents[index] = construct_agent('QLearning', config)
+                # if idx == 4:
+                #     agents[index] = construct_agent('LSTM', config)
+
                 print(f'initialize Agent {index}', end=' ')
                 print(agents[index].name)
                 index += 1
@@ -374,23 +370,27 @@ def multiAgentSimulate(strategies: dict, config: object, selection_method: str =
     if selection_method == 'QLEARNING':
         # Partner selection using tabular q method
         agents = tabular_selection(config, agents, env)
-
     if selection_method == 'RANDOM':
         agents = random_selection(config, agents, env)
-
     if selection_method == 'DQN':
         agents = dqn_selection(config, agents, env, False)
-    
     if selection_method == 'LSTM':
         agents = dqn_selection(config, agents, env, True)
-    
     if selection_method == 'LSTM-VAR':
         agents = lstm_variant_selection(config, agents, env)
 
     ###################### SEQUENTIAL #########################
     if selection_method is None:
+        sg_flag = question('Do you want to set the environment to stochastic game')
+        sg_thresh = None
+        if sg_flag:
+            print('Set the environment threshold for the stochastic game: {0,1,2,3}')
+            sg_thresh = int(input())
+            assert sg_thresh in [0,1,2,3], 'you can only set the treshold with 0, 1, 2, 3'
+        episodic_flag = question('Do you want to apply EPISODIC learning')
         # agents, select_dict, selected_dict, belief, losses = maxmin_dqrn_selection_play(config, agents, thresh=thresh)
-        agents, select_dict, selected_dict, belief, count, convergent_episode = episodic_drqn_selection(config, agents)
+        agents, select_dict, selected_dict, belief, count, convergent_episode, env = maxmin_drqn_selection(config, agents, episodic_flag=episodic_flag, sg_flag=sg_flag, sg_thresh=sg_thresh)
+        # agents, select_dict, selected_dict, belief, count, convergent_episode, env = drqn_selection(config, agents)
         print(f'select times: {select_dict}')
         print(f'selected times: {selected_dict}')
         print(f'belief: {np.squeeze(belief)}')

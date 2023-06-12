@@ -77,10 +77,10 @@ class AbstractAgent():
             Returns:
                 An action (int).
             """
-            if obs is None:
+            if obs is None and q_vals is None:
                 return random.randint(0, self.n_actions-1)
-            prob = random.random()
 
+            prob = random.random()
             if prob > self.epsilon:
                 if q_vals is not None:
                     a = argmax(q_vals)
@@ -96,7 +96,7 @@ class AbstractAgent():
                     self.Q.train()
             else:
                 a = random.randint(0, self.n_actions-1)
-            return a
+            return int(a)
 
         def update_epsilon(self, config:object):
             if self.epsilon is None:
@@ -143,6 +143,8 @@ class AbstractAgent():
                 return oppo_action.float()
             elif 'bi' in self.method:
                 assert own_action is not None, 'Make sure you input valid own_action in bi representation'
+                if 'label' in self.method:
+                    return label_encode(torch.cat((oppo_action.float(), own_action.float())))
                 return torch.cat((oppo_action.float(), own_action.float())) if oppo_action.size() == own_action.size() else None
             if 'label' in self.method:
                 state_emb = label_encode(oppo_action)
@@ -157,6 +159,8 @@ class AbstractAgent():
             if int(torch.sum(self.oppo_memory)) > self.mad_threshold:
                 self.mad = True
         def len(self):
+            if 'bi' in self.method:
+                return 2
             if self.method == 'grudger':
                 return 2
             return 1

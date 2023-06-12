@@ -1,9 +1,6 @@
-import random
 import torch
 from agent.abstract_agent import AbstractAgent
-from agent.fix_strategy_agent import FixStrategyAgent
-from utils import argmax, label_encode, Type
-from env import Environment
+from component import Memory, ReplayBuffer
 
 MADTHRESHOLD = 5
 
@@ -31,12 +28,12 @@ class TabularAgent(AbstractAgent):
         self.n_actions = config.n_actions
         self.own_memory = torch.zeros((config.n_episodes * 1000,))
         self.opponent_memory = torch.zeros((config.n_episodes * 1000,))
-        self.state = self.StateRepr(method='unilabel', mad_threshold=MADTHRESHOLD)              # an object
+        self.state = self.StateRepr(method='bilabel', mad_threshold=MADTHRESHOLD)              # an object
         self.q_table = torch.zeros((2 ** self.h * self.state.len(), 2))     # q_table: a tensor (matrix) storing Q values of each state-action pair
         # self.q_table = torch.full((2**config.h, 2), float('-inf'))
         self.play_epsilon = config.play_epsilon
         self.policy = self.EpsilonPolicy(self.q_table, self.play_epsilon, self.config.n_actions)            # an object
-        self.memory = self.ReplayBuffer(10000)
+        self.memory = ReplayBuffer(10000)
 
     def act(self, oppo_agent: object):
         """
@@ -56,7 +53,7 @@ class TabularAgent(AbstractAgent):
             self.own_memory[self.play_times - self.config.h: self.play_times])
         # label encode
         if self.play_times >= self.h:
-            self.state.state = self.state.state_repr(opponent_h_actions)
+            self.state.state = self.state.state_repr(opponent_h_actions, own_h_actions)
         return int(self.__select_action())
 
     def __select_action(self):
@@ -70,7 +67,7 @@ class TabularAgent(AbstractAgent):
         self.opponent_memory[self.play_times - 1] = opponent_action
         self.state.oppo_memory = self.opponent_memory[:self.play_times]
         
-    def optimize(self, action: int, reward: float, oppo_agent: object, state=None):
+    def optimize(self, action: int, reward: float, oppo_agent: object, state=None, flag: bool = True):
         super(TabularAgent, self).optimize(action, reward, oppo_agent)
         if self.state.state is None:
             return None
@@ -80,7 +77,7 @@ class TabularAgent(AbstractAgent):
         own_h_actions = torch.as_tensor(
             self.own_memory[self.play_times - self.config.h: self.play_times])
         # label encode
-        self.state.next_state = self.state.state_repr(opponent_h_actions)
+        self.state.next_state = self.state.state_repr(opponent_h_actions, own_h_actions)
         self.state.state = self.state.state if state is None else state
 
         # push the transition into ReplayBuffer

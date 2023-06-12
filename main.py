@@ -1,6 +1,7 @@
 import argparse
-import simulation
+import simulation, simulation_Coins
 import torch
+from utils import *
 # --------------------------------------------------------------------------- #
 # Parse command line arguments (CLAs):
 # --------------------------------------------------------------------------- #
@@ -91,11 +92,16 @@ def main():
     print(config.__repr__)
     print(f'cuda = {torch.cuda.is_available()}')
     print('Here are your game options')
-    print('press 0 to generate a benchmark against all strategies in geometric discount setting')
+    print("=== Prisoner's Dilemma Game ===")
+    print('press 0 to generate a benchmark ') # against all strategies in geometric discount setting
     print('press 1 to test an a strategy against all strategies')
     print('press 2 to play against a strategy of your choice ')
     print('press 3 to play a N agents game')
+    print()
+    print("=== Coins ===")
+    print('press 4 to play Coins')
     choice = int(input())
+
     choices = {'0-alwaysCooperate','1-alwaysDefect','2-titForTat','3-reverseTitForTat','4-random','5-grudger','6-pavlov','7-qLearning','8-lstm-TFT','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
     rl_choices = {'7-qLearning','8-lstm-pavlov','9-dqn','10-lstmqn','11-a2c','12-a2c-lstm'}
     strategies = {0:'ALLC',1:'ALLD',2:'TitForTat',3:'revTitForTat',4:'Random',5:'Grudger',6:'Pavlov',7:'QLearning',8:'LSTM',9:'DQN',10:'LSTMQN',11:'A2C',12:'A2CLSTM'}
@@ -131,6 +137,14 @@ def main():
 
     if choice == 3:
         simulation.multiAgentSimulate(strategies, config)
+
+    if choice == 4:
+        config.n_actions = 4
+        episodic_flag = question('Do you want to apply EPISODIC learning')
+        if episodic_flag:
+            simulation_Coins.simulate(config, method='episodic')
+        else:
+            simulation_Coins.simulate(config, method='normal')
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         

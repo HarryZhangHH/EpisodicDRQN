@@ -1,7 +1,6 @@
 import torch.nn.functional as F
-from env import Environment
+from component.env import Environment
 from agent.abstract_agent import AbstractAgent
-from agent.fix_strategy_agent import FixStrategyAgent
 from model import A2CLSTM
 from utils import *
 

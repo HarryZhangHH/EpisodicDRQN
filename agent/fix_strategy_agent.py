@@ -8,14 +8,15 @@ class FixStrategyAgent(AbstractAgent):
 
     def __init__(self, name: str, config: object):
         self.name = name
+        self.n_actions = config.n_actions
         super(FixStrategyAgent, self).__init__(config)
         self.own_memory = []
         self.opponent_memory = []
-        self.State = self.StateRepr(method=config.state_repr)
-        self.Policy = self.EpsilonPolicy(None, None, None)
+        self.state = self.StateRepr(method=config.state_repr)
+        self.policy = self.EpsilonPolicy(None, config.play_epsilon, self.n_actions)
 
     def roll(self):
-        return random.randint(0,1)
+        return random.randint(0,self.n_actions-1)
 
     def act(self, oppo_agent: object):
         if self.name == 'ALLC':
