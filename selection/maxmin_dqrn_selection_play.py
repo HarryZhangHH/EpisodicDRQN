@@ -3,7 +3,7 @@ import copy
 import torch.nn as nn
 
 from model import LSTMVariant
-from env import Environment, StochasticGameEnvironment
+from component.env import Environment, StochasticGameEnvironment
 from component.memory import ReplayBuffer, SettlementMemory
 from utils import *
 

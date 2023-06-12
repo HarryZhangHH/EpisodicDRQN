@@ -4,4 +4,5 @@ from selection.dqn_selection import dqn_selection
 from selection.lstm_variant_selection import lstm_variant_selection
 from selection.a2c_selection import a2c_selection
 from selection.maxmin_dqrn_selection_play import maxmin_dqrn_selection_play
-from selection.episodic_drqn_selection import episodic_drqn_selection, CentralAuthority, update_convergence_episode, check_convergence
+from selection.maxmin_drqn_selection import maxmin_drqn_selection, CentralAuthority, update_convergence_episode, check_convergence
+from selection.drqn_selection import drqn_selection, CentralAuthorityNormal

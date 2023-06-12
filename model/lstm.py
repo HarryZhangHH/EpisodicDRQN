@@ -78,3 +78,45 @@ class LSTMVariant(nn.Module):
             # normal LSTM
             out = self.fc3(out_lstm[:, -1, :])
         return out
+
+class CNNLSTM(nn.Module):
+    def __init__(self, input_size: int, out_size: int, hidden_size: int, num_layers: int=1):
+        super(CNNLSTM, self).__init__()
+        self.input_size = input_size
+        self.out_size = out_size
+        self.hidden_size= hidden_size
+        self.num_layers = num_layers
+
+        self.conv_layer1 = nn.Conv2d(in_channels=1, out_channels=13, kernel_size=3,
+                                     stride=1)  # potential check - in_channels
+        self.conv_layer2 = nn.Conv2d(in_channels=13, out_channels=26, kernel_size=3, stride=2)
+        self.conv_layer3 = nn.Conv2d(in_channels=26, out_channels=52, kernel_size=3, stride=2)
+        self.lstm_layer = nn.LSTM(input_size=52, hidden_size=hidden_size, num_layers=self.num_layers, batch_first=True)
+        self.relu = nn.ReLU()
+
+    def forward(self, x, batch_size, time_step, hidden_state, cell_state):
+        x = x.view(batch_size * time_step, 1, self.input_size, self.input_size)
+
+        conv_out = self.conv_layer1(x)
+        conv_out = self.relu(conv_out)
+        conv_out = self.conv_layer2(conv_out)
+        conv_out = self.relu(conv_out)
+        conv_out = self.conv_layer3(conv_out)
+        conv_out = self.relu(conv_out)
+
+        conv_out = conv_out.view(batch_size, time_step, 52)
+        # We take the output from the final convolutional layer and send it to a recurrent layer.
+        # The input must be reshaped into [batch x trace x units] for rnn processing,
+        # and then returned to [batch x units] when sent through the upper levles.
+        lstm_out = self.lstm_layer(conv_out, (hidden_state, cell_state))
+        out = lstm_out[0][:, time_step-1, :]
+        h_n = lstm_out[1][0]
+        c_n = lstm_out[1][1]
+        return out, (h_n, c_n)
+
+    def init_hidden_states(self, batch_size):
+        h = torch.zeros(self.num_layers, batch_size, self.hidden_size).float().to(device)
+        c = torch.zeros(self.num_layers, batch_size, self.hidden_size).float().to(device)
+
+        return h, c
+

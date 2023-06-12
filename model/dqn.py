@@ -15,6 +15,7 @@ class DQN():
     def train(self, agent: object, batch: object):
         loss = self.optimize(agent.policy_net, agent.target_net, agent.optimizer, batch, agent.config.discount, agent.criterion)
         agent.loss.append(loss.item())
+        return loss
 
     @staticmethod
     def compute_q_vals(Q: object, states: Type.TensorType, actions: Type.TensorType):

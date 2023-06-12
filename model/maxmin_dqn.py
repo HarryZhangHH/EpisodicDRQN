@@ -7,6 +7,12 @@ from model import *
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class MaxminDQN(DQN):
+    # def train(self, agent: object, batch: object):
+    #     loss = self.optimize(agent.play_policy_net_dict[m], agent.play_target_net_dict,
+    #                          agent.play_optimizer_dict[m], batch, agent.config.discount,
+    #                          agent.criterion)
+    #     agent.loss.append(loss.item())
+    #     return loss
 
     @staticmethod
     def maxmin_q_vals(net_dict: dict[int, object], state: Type.TensorType):
