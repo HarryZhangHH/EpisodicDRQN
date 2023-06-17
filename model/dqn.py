@@ -64,3 +64,21 @@ class DQN():
         #     param.grad.data.clamp_(-1, 1)  # DQN gradient clipping: Clamps all elements in input into the range [ min, max ].
         optimizer.step()
         return loss
+
+    @staticmethod
+    def get_action(policy_net_dict: dict[int, object], state: Type.TensorType, n_actions: int, policy: object) -> int:
+        if state is None:
+            return random.randint(0, n_actions - 1)
+
+        if not list(policy_net_dict.keys()):
+            return random.randint(0, n_actions - 1)
+
+        if not isinstance(state, tuple):
+            state = state[None]
+        else:
+            state = (state[0][None], state[1][None])  # used by LSTMVariant network
+
+        policy_net = [ele[0] for ele in policy_net_dict.values()]
+        q_min = DQN.compute_q_vals(policy_net, state).cpu().detach().numpy().flatten()
+        action = policy.sample_action(state, q_min)
+        return action
