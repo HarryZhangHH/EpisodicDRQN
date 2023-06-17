@@ -40,7 +40,7 @@ def maxmin_drqn_selection(config: object, agents: dict, k:int = 1000, episodic_f
     # Initialize convergence threshold
     count = 0
     test_state = generate_state(agents[0], config.h, config.n_actions, k)
-    test_state = torch.stack(test_state, dim=0).view(k, config.h, -1).to(device)
+    test_state = torch.stack(test_state, dim=0).view(len(test_state), config.h, -1).to(device)
     thresh_strategy = k * config.min_epsilon + 5
     thresh_network = k/100
     thresh_reward = 1
@@ -102,7 +102,7 @@ def maxmin_drqn_selection(config: object, agents: dict, k:int = 1000, episodic_f
     return agents, select_dict, selected_dict, authority.beliefs, count, convergent_episode_dict, authority.env
 
 class CentralAuthority():
-    def __init__(self, config: object, agents: dict[int, object], k: int, episodic_flag: bool = True, sg_flag: bool = False, settlement_prob: float = SETTLEMENT_PROB, sg_thresh: int = 0, select_epsilon_decay: float = 0.999, update_times: int = UPDATE_TIMES, select_method: str = 'DDQN'):
+    def __init__(self, config: object, agents: dict[int, object], k: int, episodic_flag: bool = True, sg_flag: bool = False, settlement_prob: float = SETTLEMENT_PROB, sg_thresh: int = 0, select_epsilon_decay: float = 0.999, update_times: int = UPDATE_TIMES, select_method: str = 'DDQN', play_method: str = 'MaxminDQN'):
         self.config = config
         self.n_agents = len(agents)
         self.k = k
@@ -121,6 +121,8 @@ class CentralAuthority():
         self.state = 1
         self.selection_loss_dict = {}
         self.select_model = DDQN() if select_method=='DDQN' else DQN()
+        self.play_model = MaxminDQN() if 'Maxmin' in play_method else DQN()
+
 
     @staticmethod
     def map_action(a: int):
@@ -166,9 +168,11 @@ class CentralAuthority():
 
     def play(self, agent1: object, agent2: object, env: object):
         a1, a2 = agent1.act(agent2), agent2.act(agent1)
+        print(a1, a2, end=' ')
         if agent1.state.state is not None and agent2.state.state is not None:
-            a1 = MaxminDQN.get_action(agent1.play_policy_net_dict, agent1.state.state, agent1.n_actions, agent1.policy)
-            a2 = MaxminDQN.get_action(agent2.play_policy_net_dict, agent2.state.state, agent2.n_actions, agent2.policy)
+            a1 = self.play_model.get_action(agent1.play_policy_net_dict, agent1.state.state, agent1.n_actions, agent1.policy)
+            a2 = self.play_model.get_action(agent2.play_policy_net_dict, agent2.state.state, agent2.n_actions, agent2.policy)
+        print(a1, a2)
 
         # check the SG state
         agents = {}
@@ -192,6 +196,26 @@ class CentralAuthority():
                 m = random.randint(0, self.n_agents - 1)
         return m
 
+    def update_network(self):
+        # update the target network, copying all weights and biases in DRQN
+        for n in self.agents:
+            agent = self.agents[n]
+            agent.target_net.load_state_dict(agent.policy_net.state_dict())
+
+            for m in agent.play_target_net_dict:
+                if self.play_model == DQN():
+                    agent.play_policy_net_dict[m].load_state_dict(agent.policy_net.state_dict())
+                agent.play_target_net_dict[m].load_state_dict(agent.play_policy_net_dict[m].state_dict())
+
+    def clean_buffers(self):
+        self.settlement_memory.clean()
+        # clean the buffer
+        for n in self.agents:
+            agent = self.agents[n]
+            agent.selection_memory.clean()
+            for m in agent.play_memory_dict:
+                agent.play_memory_dict[m].clean()
+
     def run(self, select_dict: dict[int, int], selected_dict: dict[int, int], convergent: bool = False, seed: int = 42):
         seed_everything(seed)
         for n in self.agents:
@@ -212,22 +236,9 @@ class CentralAuthority():
                         play_times.append(agent.play_memory_dict[m].__len__())
                 # print(play_times, sum(np.array(play_times)>=self.config.batch_size))
                 if sum(np.array(play_times) >= self.config.batch_size) != 0:
-                    # update the target network, copying all weights and biases in DRQN
-                    for n in self.agents:
-                        agent = self.agents[n]
-                        agent.target_net.load_state_dict(agent.policy_net.state_dict())
+                    self.update_network()
+                    self.clean_buffers()
 
-                        for m in agent.play_target_net_dict:
-                            agent.play_policy_net_dict[m].load_state_dict(agent.policy_net.state_dict())
-                            agent.play_target_net_dict[m].load_state_dict(agent.play_policy_net_dict[m].state_dict())
-                        self.settlement_memory.clean()
-
-                    # clean the buffer
-                    for n in self.agents:
-                        agent = self.agents[n]
-                        agent.selection_memory.clean()
-                        for m in agent.play_memory_dict:
-                            agent.play_memory_dict[m].clean()
                 continue
             elif not self.episodic_flag:
                 self.__optimize_play_model()
@@ -326,7 +337,7 @@ class CentralAuthority():
     def __optimize_selection_model(self, agent: object):
         """ Train and optimize our selection model """
         # don't learn without some decent experience
-        if agent.selection_memory.__len__() < BATCH_SIZE:
+        if agent.selection_memory.__len__() < BATCH_SIZE or self.select_epsilon_decay == 1:
             return None
         # random transition batch is taken from experience replay memory
         transitions = agent.selection_memory.sample(BATCH_SIZE)
@@ -398,16 +409,18 @@ class CentralAuthority():
                         # random transition batch is taken from experience replay memory
                         transitions = agent.play_memory_dict[m].sample(agent.config.batch_size)
                         batch = agent.get_batch(transitions)
-                        # loss = MaxminDQN.optimize(agent.play_policy_net_dict[m], agent.play_target_net_dict,
-                        #                           agent.play_optimizer_dict[m], batch, agent.config.discount,
-                        #                           agent.criterion)
-                        loss = agent.model.train(agent, batch)
+                        if self.play_model == MaxminDQN():
+                            loss = self.play_model.optimize(agent.play_policy_net_dict[m], agent.play_target_net_dict,
+                                                      agent.play_optimizer_dict[m], batch, agent.config.discount,
+                                                      agent.criterion)
+                        elif self.play_model == DQN():
+                            loss = agent.model.train(agent, batch)
                         agent.play_loss_dict[m].append(loss.item())
                         # update play_epsilon
                         agent.policy.update_epsilon(agent.config)
                         agent.updating_times[m] += 1
 
-def check_convergence(agents: dict[int, object], test_state: Type.TensorType, thresh: tuple, k: int, last_reward: dict[int, float], test_q_dict: dict, count: int):
+def check_convergence(agents: dict[int, object], test_state: Type.TensorType, thresh: tuple, k: int, last_reward: dict[int, float], test_q_dict: dict, count: int, play_model):
     strategy_convergent_episode = {}
     reward_convergent_episode = {}
     network_convergent_episode = {}
@@ -424,7 +437,10 @@ def check_convergence(agents: dict[int, object], test_state: Type.TensorType, th
             reward_convergent_episode[n] = agents[n].play_times
 
         with torch.no_grad():
-            test_q_dict[n][count] = MaxminDQN.maxmin_q_vals(agents[n].play_policy_net_dict, test_state).to('cpu').detach().numpy()
+            if play_model == MaxminDQN():
+                test_q_dict[n][count] = MaxminDQN.maxmin_q_vals(agents[n].play_policy_net_dict, test_state).to('cpu').detach().numpy()
+            elif play_model == DQN():
+                test_q_dict[n][count] = agents[n].policy_net(test_state).to('cpu').detach().numpy()
 
         diff = np.sum(np.diff(test_q_dict[n][count])) - np.sum(np.diff(test_q_dict[n][count-1])) if count>1 else np.inf
 

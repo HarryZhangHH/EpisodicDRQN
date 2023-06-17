@@ -179,11 +179,12 @@ class CentralAuthorityNormal():
             if self.state==-1 and self.episodic_flag:
                 # print(f'======= Episode: {i} SETTLEMENT =======')
                 self.__optimize_play_model()
+                self.beliefs = np.clip(self.beliefs, -1, 1)  # clip belief into [-1,1]
+
                 # update the target network, copying all weights and biases in DRQN
                 for n in self.agents:
                     agent = self.agents[n]
                     agent.target_net.load_state_dict(agent.policy_net.state_dict())
-                self.beliefs = np.clip(self.beliefs, -1, 1)  # clip belief into [-1,1]
 
                 # clean the buffer
                 for n in self.agents:
@@ -234,6 +235,10 @@ class CentralAuthorityNormal():
             agent1.optimize(a1, r1, agent2, flag=not self.episodic_flag)
             agent2.optimize(a2, r2, agent1, flag=not self.episodic_flag)
 
+            if not self.episodic_flag:
+                agent1.updating_times += 1
+                agent2.updating_times += 1
+
             # update beliefs
             self.update_belief(n, m, a1, a2)
             self.env.update(r1+r2)
@@ -276,7 +281,7 @@ class CentralAuthorityNormal():
     def __optimize_selection_model(self, agent: object):
         """ Train and optimize our selection model """
         # don't learn without some decent experience
-        if agent.selection_memory.__len__() < BATCH_SIZE:
+        if agent.selection_memory.__len__() < BATCH_SIZE or self.select_epsilon_decay == 1:
             return None
         # random transition batch is taken from experience replay memory
         transitions = agent.selection_memory.sample(BATCH_SIZE)

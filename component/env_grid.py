@@ -161,7 +161,7 @@ class Coins(object):
         a = np.stack([b, c, d], axis=2)
         return a
 
-env = Coins(size=5, config=None)
+# env = Coins(size=5, config=None)
 
 
 
