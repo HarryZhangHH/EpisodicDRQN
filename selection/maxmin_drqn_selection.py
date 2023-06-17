@@ -12,7 +12,7 @@ BATCH_SIZE = 64
 FEATURE_SIZE = 1
 BUFFER_SIZE = 1000
 NUM_LAYER = 1
-SETTLEMENT_PROB = 0.01
+SETTLEMENT_PROB = 0.015
 UPDATE_TIMES = 10
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -67,7 +67,7 @@ def maxmin_drqn_selection(config: object, agents: dict, k:int = 1000, episodic_f
         agents = authority.agents
 
         strategy_convergent_episode, reward_convergent_episode, network_convergent_episode, test_q_dict = check_convergence(
-            agents, test_state, thresh, k, last_reward, test_q_dict, count)
+            agents, test_state, thresh, k, last_reward, test_q_dict, count, authority.play_method)
         count += 1
 
         update_convergence_episode(convergent_episode_dict, 'strategy', strategy_convergent_episode)
@@ -121,6 +121,7 @@ class CentralAuthority():
         self.state = 1
         self.selection_loss_dict = {}
         self.select_model = DDQN() if select_method=='DDQN' else DQN()
+        self.play_method = play_method
         self.play_model = MaxminDQN() if 'Maxmin' in play_method else DQN()
 
 
@@ -168,11 +169,9 @@ class CentralAuthority():
 
     def play(self, agent1: object, agent2: object, env: object):
         a1, a2 = agent1.act(agent2), agent2.act(agent1)
-        print(a1, a2, end=' ')
         if agent1.state.state is not None and agent2.state.state is not None:
             a1 = self.play_model.get_action(agent1.play_policy_net_dict, agent1.state.state, agent1.n_actions, agent1.policy)
             a2 = self.play_model.get_action(agent2.play_policy_net_dict, agent2.state.state, agent2.n_actions, agent2.policy)
-        print(a1, a2)
 
         # check the SG state
         agents = {}
@@ -203,7 +202,7 @@ class CentralAuthority():
             agent.target_net.load_state_dict(agent.policy_net.state_dict())
 
             for m in agent.play_target_net_dict:
-                if self.play_model == DQN():
+                if self.play_method == 'DQN':
                     agent.play_policy_net_dict[m].load_state_dict(agent.policy_net.state_dict())
                 agent.play_target_net_dict[m].load_state_dict(agent.play_policy_net_dict[m].state_dict())
 
@@ -409,18 +408,17 @@ class CentralAuthority():
                         # random transition batch is taken from experience replay memory
                         transitions = agent.play_memory_dict[m].sample(agent.config.batch_size)
                         batch = agent.get_batch(transitions)
-                        if self.play_model == MaxminDQN():
+                        if 'Maxmin' in self.play_method:
                             loss = self.play_model.optimize(agent.play_policy_net_dict[m], agent.play_target_net_dict,
-                                                      agent.play_optimizer_dict[m], batch, agent.config.discount,
-                                                      agent.criterion)
-                        elif self.play_model == DQN():
+                                                      agent.play_optimizer_dict[m], batch, agent.config.discount, agent.criterion)
+                        else:
                             loss = agent.model.train(agent, batch)
                         agent.play_loss_dict[m].append(loss.item())
                         # update play_epsilon
                         agent.policy.update_epsilon(agent.config)
                         agent.updating_times[m] += 1
 
-def check_convergence(agents: dict[int, object], test_state: Type.TensorType, thresh: tuple, k: int, last_reward: dict[int, float], test_q_dict: dict, count: int, play_model):
+def check_convergence(agents: dict[int, object], test_state: Type.TensorType, thresh: tuple, k: int, last_reward: dict[int, float], test_q_dict: dict, count: int, play_method: str):
     strategy_convergent_episode = {}
     reward_convergent_episode = {}
     network_convergent_episode = {}
@@ -437,9 +435,9 @@ def check_convergence(agents: dict[int, object], test_state: Type.TensorType, th
             reward_convergent_episode[n] = agents[n].play_times
 
         with torch.no_grad():
-            if play_model == MaxminDQN():
+            if 'Maxmin' in play_method:
                 test_q_dict[n][count] = MaxminDQN.maxmin_q_vals(agents[n].play_policy_net_dict, test_state).to('cpu').detach().numpy()
-            elif play_model == DQN():
+            else:
                 test_q_dict[n][count] = agents[n].policy_net(test_state).to('cpu').detach().numpy()
 
         diff = np.sum(np.diff(test_q_dict[n][count])) - np.sum(np.diff(test_q_dict[n][count-1])) if count>1 else np.inf
