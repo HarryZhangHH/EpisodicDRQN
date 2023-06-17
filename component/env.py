@@ -68,7 +68,18 @@ class Environment():
 
     def reset_state(self):
         pass
-
+    
+    @staticmethod
+    def evaluate_actions(a1: int, a2: int):
+        if a1 == 0 and a2 == 0:
+            return 'Mutual Cooperation'
+        if a1 == 1 and a2 == 1:
+            return 'Mutual Defection'
+        if a1 == 0 and a2 == 1:
+            return 'Exploitation'
+        if a1 == 1 and a2 == 0:
+            return 'Deception'
+        
 class StochasticGameEnvironment(Environment):
     """
     PD payoff matrix
