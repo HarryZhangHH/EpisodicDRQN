@@ -216,7 +216,6 @@ class CentralAuthority():
                 agent.play_memory_dict[m].clean()
 
     def run(self, select_dict: dict[int, int], selected_dict: dict[int, int], convergent: bool = False, seed: int = 42):
-        seed_everything(seed)
         for n in self.agents:
             self.selection_loss_dict[n] = []
         # select using rl based on selection epsilon
