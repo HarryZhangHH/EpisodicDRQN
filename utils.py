@@ -167,7 +167,7 @@ def generate_payoff_matrix(name:str = 'PD', REWARD:int = 1, TEMPTATION:int = Non
             sucker > punishment) == N, f'{np.sum(reward > temptation)} and {np.sum(temptation > sucker)} and {np.sum(sucker > punishment)}'
         return reward, temptation, sucker, punishment
 
-def generate_state(agent: object, h: int, n_actions: int, k: int = 1000, seed:int = 42):
+def generate_state(agent: object, h: int, n_actions: int, k: int, seed:int = 42):
     seed_everything(seed)
     # enumerate binary to generate h actions
     binary_enum = [i for i in range(n_actions ** h)]
@@ -179,20 +179,17 @@ def generate_state(agent: object, h: int, n_actions: int, k: int = 1000, seed:in
         binary_list.append(torch.as_tensor(x))
 
     state_list = []
-
-    if len(binary_list)**2 > 1000:
-        for _ in range(k):
-            h_actions = random.choices(binary_list, k=2)
-            own_h_actions, opponent_h_actions = h_actions[0], h_actions[1]
-
+    for i in binary_list:
+        for j in binary_list:
+            own_h_actions, opponent_h_actions = i, j
             state = agent.state.state_repr(opponent_h_actions, own_h_actions)
             state = torch.permute(state.view(-1, h), (1, 0))  # important
             state_list.append(state)
-    else:
-        for i in binary_list:
-            for j in binary_list:
-                own_h_actions, opponent_h_actions = i, j
-                state = agent.state.state_repr(opponent_h_actions, own_h_actions)
-                state = torch.permute(state.view(-1, h), (1, 0))  # important
-                state_list.append(state)
+    # for _ in range(k):
+    #     h_actions = random.choices(binary_list, k=2)
+    #     own_h_actions, opponent_h_actions = h_actions[0], h_actions[1]
+    #
+    #     state = agent.state.state_repr(opponent_h_actions, own_h_actions)
+    #     state = torch.permute(state.view(-1, h), (1, 0))  # important
+    #     state_list.append(state)
     return state_list

@@ -42,8 +42,8 @@ def maxmin_drqn_selection(config: object, agents: dict, k:int = 1000, episodic_f
     test_state = generate_state(agents[0], config.h, config.n_actions, k)
     test_state = torch.stack(test_state, dim=0).view(len(test_state), config.h, -1).to(device)
     thresh_strategy = k * config.min_epsilon + 5
-    thresh_network = k/100
-    thresh_reward = 1
+    thresh_network = k/10
+    thresh_reward = 1.5
     thresh = (thresh_strategy, thresh_reward, thresh_network)
 
     # initialize running log
@@ -102,7 +102,7 @@ def maxmin_drqn_selection(config: object, agents: dict, k:int = 1000, episodic_f
     return agents, select_dict, selected_dict, authority.beliefs, count, convergent_episode_dict, authority.env
 
 class CentralAuthority():
-    def __init__(self, config: object, agents: dict[int, object], k: int, episodic_flag: bool = True, sg_flag: bool = False, settlement_prob: float = SETTLEMENT_PROB, sg_thresh: int = 0, select_epsilon_decay: float = 0.999, update_times: int = UPDATE_TIMES, select_method: str = 'DDQN', play_method: str = 'MaxminDQN'):
+    def __init__(self, config: object, agents: dict[int, object], k: int, episodic_flag: bool = True, sg_flag: bool = False, settlement_prob: float = SETTLEMENT_PROB, sg_thresh: int = 0, select_epsilon_decay: float = 0.999, update_times: int = UPDATE_TIMES, select_method: str = 'DDQN', play_method: str = 'MaxminDQN', clean_flag: bool = True):
         self.config = config
         self.n_agents = len(agents)
         self.k = k
@@ -123,6 +123,7 @@ class CentralAuthority():
         self.select_model = DDQN() if select_method=='DDQN' else DQN()
         self.play_method = play_method
         self.play_model = MaxminDQN() if 'Maxmin' in play_method else DQN()
+        self.clean_flag = clean_flag
 
 
     @staticmethod
@@ -235,16 +236,15 @@ class CentralAuthority():
                 # print(play_times, sum(np.array(play_times)>=self.config.batch_size))
                 if sum(np.array(play_times) >= self.config.batch_size) != 0:
                     self.update_network()
-                    self.clean_buffers()
+                    if self.clean_flag:
+                        self.clean_buffers()
 
                 continue
             elif not self.episodic_flag:
                 self.__optimize_play_model()
-                for n in self.agents:
-                    agent = self.agents[n]
-                    for m in agent.play_target_net_dict:
-                        if agent.play_memory_dict[m].__len__() % TARGET_UPDATE == 0:
-                            agent.play_target_net_dict[m].load_state_dict(agent.play_policy_net_dict[m].state_dict())
+                self.update_network()
+                if self.clean_flag:
+                    self.clean_buffers()
 
             # check selection state: (h_action, features)
             while True:
