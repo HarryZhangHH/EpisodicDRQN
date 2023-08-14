@@ -1,5 +1,5 @@
-# PartnerSelection
-Implementation for the paper: Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning [^1]
+# Incentivizing Spontaneous Cooperation in Social Dilemmas Using Deep Reinforcement Learning
+Contains implementation for the paper: Partner Selection for Emergence of cooperation in multi-agent systems using reinforcement learning [^1]
 
 # Setting up an environment
 create an environment with the command:
