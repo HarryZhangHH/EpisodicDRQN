@@ -10,7 +10,7 @@ class DDQN(DQN):
     '''
     Implementation of DDQN with target network and replay buffer
     '''
-    def __int__(self):
+    def __init__(self):
         self.optimize = DDQN.optimize()
 
     @staticmethod
