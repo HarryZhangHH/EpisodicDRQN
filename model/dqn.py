@@ -9,7 +9,7 @@ class DQN():
     '''
     Implementation of DQN with target network and replay buffer
     '''
-    def __int__(self):
+    def __init__(self):
         self.optimize = DQN.optimize()
 
     def train(self, agent: object, batch: object):
